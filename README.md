@@ -41,15 +41,28 @@ The customer-service demo uses the fictional company Nova Demo and synthetic inf
 
 ## GitHub and Cloudflare Pages
 
-1. The selected destination is [thalesxavier1298/ThalesXavier-Lab](https://github.com/thalesxavier1298/ThalesXavier-Lab). Upload is pending: the connected GitHub integration rejected writing with HTTP 403, and local GitHub CLI authentication was invalid.
-2. Once authenticated with write access, initialize this project folder with `git init`, add the selected repository as `origin`, commit the source and push the `main` branch. After the initial upload, clone the repository on other computers and run `npm install`. Never commit secrets, `node_modules` or generated `dist` files.
+1. The source repository is [thalesxavier1298/ThalesXavier-Lab](https://github.com/thalesxavier1298/ThalesXavier-Lab), branch `main`. The initial source upload has been confirmed.
+2. Clone the repository and run `npm install` to develop on another computer. Commit and push future source changes. Never commit secrets, `node_modules` or generated `dist` files.
 3. In Cloudflare, open Workers & Pages, create a Pages project and connect that GitHub repository.
 4. Choose the Vite preset, build command `npm run build`, output `dist`, and this folder as the root if nested in a repository. Use a supported Node version (22 or 24).
 5. Deploy. The generated Pages URL is the initial public address. No deployment has been performed by this local project.
-6. `public/_redirects` is copied into `dist` and provides `/* /index.html 200` for SPA routes. Do not add a top-level `404.html` that interferes with SPA fallback. Verify `/about`, `/projects/assignment-hub` and an unknown path by direct visit and refresh on the actual Pages host.
+6. Pages provides its default SPA fallback when no top-level `404.html` is present. Do not add the catch-all `/* /index.html 200` redirect: the Workers deployment rejects that rule as a loop. Verify `/about`, `/projects/assignment-hub` and an unknown path by direct visit and refresh on the actual host.
 7. Add a custom domain later in the project's Custom domains section and follow Cloudflare's DNS instructions.
 8. Update `config.siteUrl` when the final origin is known. The next production build automatically generates `dist/sitemap.xml` and its entry in `robots.txt` using that real origin. Until configured, sitemap generation is deferred to avoid inventing a domain. Add canonical/OG URL metadata once the actual public origin is chosen if desired.
 9. Future edits pushed to the connected production branch trigger a new build. Add social/profile links and independent app URLs in configuration only when their real addresses are available.
+
+## Existing Cloudflare Workers project
+
+The dashboard deployment log showed the project `thalesxavier-lab` uses Workers Static Assets rather than Pages. This is supported by the checked-in `wrangler.jsonc`:
+
+- Build command: `npm run build`.
+- Deploy command: `npx wrangler deploy`.
+- Root directory: repository root (leave blank or use `/` in the dashboard).
+- Worker name: `thalesxavier-lab`, matching the existing project.
+- Static asset directory: `./dist`.
+- SPA fallback: `assets.not_found_handling: "single-page-application"`.
+
+No Worker script, database or secrets are required. The unsupported catch-all `_redirects` file has been removed; preserve that removal in future builds. Deploy the corrected commit, rather than retrying the old failed commit. Cloudflare supplies the actual public URL after a successful deployment; no URL is assumed here. Actual hosted route checks remain pending until that URL is available.
 
 ## Routes
 

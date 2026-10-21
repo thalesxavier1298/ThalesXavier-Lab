@@ -24,6 +24,10 @@
 - Image lightboxes, carousel controls and native video playback are implemented for configured assets; they were not exercised with real media because none was supplied.
 - Public demo actions never connect to real services. Original application feature descriptions are based on the supplied brief; their source code was not available for independent verification.
 - No automated accessibility audit, screen-reader session, real-device browser matrix or real email delivery test was performed.
-- The Cloudflare SPA fallback file is present, and direct routes work in Vite production preview. Actual Cloudflare deployment, DNS, hosted refreshes and share-crawler rendering remain to be verified after publishing.
+- Direct routes work in Vite production preview. The initial Pages redirect file was subsequently removed for Workers compatibility; see the deployment correction below. Actual Cloudflare deployment, DNS, hosted refreshes and share-crawler rendering remain to be verified after publishing.
 - At initial verification, no GitHub repository was identified and no remote was created, pushed or deployed. The user subsequently selected `thalesxavier1298/ThalesXavier-Lab` for source storage. Saving source on GitHub does not deploy the website; Cloudflare publishing remains a separate step.
 - The selected repository was confirmed empty. An attempted initial README write failed with GitHub HTTP 403, “Resource not accessible by integration.” The local GitHub CLI reported invalid authentication, and the available browser was signed out. No files were saved remotely. A fresh production build passed before this upload attempt.
+
+## Cloudflare deployment correction
+
+The initial source upload was later confirmed on GitHub at commit `f9c5f1d`. The user's Cloudflare log showed a Workers Static Assets deployment rejecting `/* /index.html 200` as an infinite redirect loop. Removed `public/_redirects` and added `wrangler.jsonc` for the existing Worker `thalesxavier-lab`, asset directory `./dist` and native `single-page-application` fallback. Earlier statements about the redirect file describe the initial Pages preparation, not the corrected Worker configuration. A real hosted deployment still requires confirmation from Cloudflare.
