@@ -31,3 +31,5 @@
 ## Cloudflare deployment correction
 
 The initial source upload was later confirmed on GitHub at commit `f9c5f1d`. The user's Cloudflare log showed a Workers Static Assets deployment rejecting `/* /index.html 200` as an infinite redirect loop. Removed `public/_redirects` and added `wrangler.jsonc` for the existing Worker `thalesxavier-lab`, asset directory `./dist` and native `single-page-application` fallback. Earlier statements about the redirect file describe the initial Pages preparation, not the corrected Worker configuration. A real hosted deployment still requires confirmation from Cloudflare.
+
+The corrected `npm run build` passed. A static check confirmed the Worker name, output directory, native SPA setting, production index and absence of `dist/_redirects`. A Wrangler dry run could not execute because Windows rejected package installation with EPERM; no Wrangler validation or successful deployment is claimed. Automatic remote writing remained blocked by GitHub integration HTTP 403 and local credential-manager access. The correction is committed locally and can be pushed using the supplied Windows upload helper.
