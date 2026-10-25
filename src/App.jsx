@@ -84,8 +84,8 @@ export default function App() {
       </a>
       <header>
         <div className="header-inner">
-          <Link to="/" className="brand" aria-label="Thales Serra Xavier">
-            thales<span>.</span>
+          <Link to="/" className="brand" aria-label={t.brandHome}>
+            {t.brand}<span>.</span>
           </Link>
           <nav
             className={menu ? "open" : ""}
@@ -145,8 +145,8 @@ export default function App() {
       </main>
       <footer>
         <div>
-          <Link to="/" className="brand">
-            thales<span>.</span>
+          <Link to="/" className="brand" aria-label={t.brandHome}>
+            {t.brand}<span>.</span>
           </Link>
           <p>{t.footer}</p>
         </div>

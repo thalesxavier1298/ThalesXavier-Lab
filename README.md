@@ -72,4 +72,8 @@ No Worker script, database or secrets are required. The unsupported catch-all `_
 
 Semantic landmarks, skip link, active navigation, visible focus rings, native controls/dialogs, translated labels, touch targets, reduced motion and system theme detection are included. Production build and browser verification results are recorded in `QA.md`. The gallery's actual media playback and real integrations require supplied files/URLs and are not asserted as tested with nonexistent assets.
 
-Before public launch, add the real photo and authorized media, confirm personal facts, configure live application/social URLs, and verify direct route refreshes on the actual hosting configuration. No private data, production workflow definitions or API keys belong in this static project.
+The supplied professional portrait and soccer trophy photo are configured in the site. Add authorized project media, confirm personal facts, and configure live application/social URLs as they become available. No private data, production workflow definitions or API keys belong in this static project.
+
+## Personal photos and portfolio identity
+
+The header and footer show Portfolio (EN) / Portfólio (PT). In `src/config.js`, `portrait` supplies the Home/About image, `portraitPosition` controls its CSS framing, and `athleticPhoto` supplies the Education athletics image. The trophy photograph is displayed at its original aspect ratio to preserve the full image. Both files are in `public/images/profile/`. Replace paths there to change photos; clearing `athleticPhoto` restores the labeled placeholder. Alternative text and captions are centralized in `src/i18n.js`.

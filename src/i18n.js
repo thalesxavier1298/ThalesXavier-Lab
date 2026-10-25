@@ -1,5 +1,10 @@
 export const messages = {
   en: {
+    brand: "Portfolio",
+    brandHome: "Thales Serra Xavier — Portfolio home",
+    athleticPhotoAlt: "Thales Serra Xavier in soccer team clothing, holding a trophy",
+    athleticPhotoPlaceholder: "Athletic photograph to be added",
+    athleticPhotoCaption: "Discipline, teamwork and adaptability through sport.",
     nav: [
       "Home",
       "About Me",
@@ -146,6 +151,11 @@ export const messages = {
     portraitAlt: "Professional portrait of Thales Serra Xavier",
   },
   pt: {
+    brand: "Portfólio",
+    brandHome: "Thales Serra Xavier — Início do portfólio",
+    athleticPhotoAlt: "Thales Serra Xavier com uniforme da equipe de futebol, segurando um troféu",
+    athleticPhotoPlaceholder: "Fotografia esportiva será adicionada",
+    athleticPhotoCaption: "Disciplina, trabalho em equipe e adaptabilidade através do esporte.",
     nav: [
       "Início",
       "Sobre Mim",

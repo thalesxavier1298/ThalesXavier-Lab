@@ -27,9 +27,9 @@ export function Heading({ eyebrow, title, children }) {
 export function Photo() {
   const { t } = useCopy();
   return (
-    <div className="portrait">
+    <div className={`portrait${config.portrait ? " has-photo" : ""}`}>
       {config.portrait ? (
-        <img src={config.portrait} alt={t.portraitAlt} />
+        <img src={config.portrait} alt={t.portraitAlt} style={{ objectPosition: config.portraitPosition }} />
       ) : (
         <>
           <div className="portrait-lines" />

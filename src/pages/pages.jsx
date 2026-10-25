@@ -199,14 +199,27 @@ export function Timeline({ type }) {
         ))}
       </div>
       {ed && (
-        <div className="panel">
-          <h2>{t.athletic}</h2>
-          <p>{t.athleteText}</p>
-          <ul>
-            {t.athletes.map((s) => (
-              <li key={s}>{s}</li>
-            ))}
-          </ul>
+        <div className="panel athletic-section">
+          <div className="athletic-copy">
+            <h2>{t.athletic}</h2>
+            <p>{t.athleteText}</p>
+            <ul>
+              {t.athletes.map((s) => (
+                <li key={s}>{s}</li>
+              ))}
+            </ul>
+          </div>
+          <figure className="athletic-photo">
+            {config.athleticPhoto ? (
+              <img src={config.athleticPhoto} alt={t.athleticPhotoAlt} loading="lazy" width="740" height="1600" />
+            ) : (
+              <div className="athletic-photo-placeholder">
+                <span aria-hidden="true">TX</span>
+                <p>{t.athleticPhotoPlaceholder}</p>
+              </div>
+            )}
+            <figcaption>{t.athleticPhotoCaption}</figcaption>
+          </figure>
         </div>
       )}
     </section>

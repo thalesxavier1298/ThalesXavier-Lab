@@ -3,7 +3,9 @@ export const config = {
   github: "",
   linkedin: "",
   resume: "",
-  portrait: "",
+  portrait: "/images/profile/thales-portrait.jpeg",
+  portraitPosition: "50% 40%",
+  athleticPhoto: "/images/profile/thales-soccer-trophy.jpeg",
   siteUrl: "",
   demos: { "daily-planner": "", "assignment-hub": "" },
 };
