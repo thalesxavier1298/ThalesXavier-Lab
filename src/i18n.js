@@ -109,6 +109,8 @@ export const messages = {
     connectText:
       "Open to conversations with recruiters, collaborators and businesses exploring practical AI solutions.",
     email: "Send an email",
+    phoneUS: "United States phone",
+    phoneBR: "Brazil phone",
     location: "Alexandria, Louisiana, United States",
     footer: "Business knowledge. Practical innovation.",
     menu: "Toggle navigation",
@@ -265,6 +267,8 @@ export const messages = {
     connectText:
       "Aberto a conversas com recrutadores, colaboradores e empresas que buscam soluções práticas com IA.",
     email: "Enviar e-mail",
+    phoneUS: "Telefone dos Estados Unidos",
+    phoneBR: "Telefone do Brasil",
     location: "Alexandria, Louisiana, Estados Unidos",
     footer: "Conhecimento de negócios. Inovação prática.",
     menu: "Alternar navegação",

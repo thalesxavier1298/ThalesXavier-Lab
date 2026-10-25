@@ -37,3 +37,7 @@ The corrected `npm run build` passed. A static check confirmed the Worker name, 
 ## Personal photos update — October 25, 2026
 
 Changed the header/footer label to Portfolio / Portfólio and added the user-approved black-shirt portrait on Home/About and trophy photo beside the athletics section on Education. Kept original photo files, provided translated alt text and captions, and retained configurable photo paths and an athletics placeholder. Production build passed. In-browser checks at 320, 390, 768 and 1280px showed the intended images loading and no horizontal overflow on Home, About and Education. Verified Portuguese brand/caption/document language and inspected browser errors: none captured. Local screenshots were saved. These results describe the local preview; public deployment awaits a successful repository push.
+
+## Contact phone update — October 25, 2026
+
+At the user’s explicit request, added US +1 (585) 360-6732 and Brazil +55 (24) 99983-0145 alongside the existing email on Contact and the homepage contact section. Phone data is centralized in config. Production build passed. In the local browser, verified both exact tel: destinations, English/Portuguese country labels, no horizontal overflow at 390px and no captured application errors. No test call was placed. Public deployment remains pending the upload helper.

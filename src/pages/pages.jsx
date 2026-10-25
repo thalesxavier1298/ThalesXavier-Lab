@@ -10,6 +10,7 @@ import {
   Palette,
   Check,
   Mail,
+  Phone,
 } from "lucide-react";
 import { useCopy } from "../context";
 import { config } from "../config";
@@ -373,6 +374,15 @@ export function CaseStudy() {
     </section>
   );
 }
+function PhoneContacts() {
+  const { t } = useCopy();
+  return <dl className="contact-phones">{config.phones.map(phone => (
+    <div key={phone.labelKey}>
+      <dt>{t[phone.labelKey]}</dt>
+      <dd><a href={phone.href} aria-label={t[phone.labelKey] + ": " + phone.display}><Phone size={18} aria-hidden="true" />{phone.display}</a></dd>
+    </div>
+  ))}</dl>;
+}
 export function Contact({ compact = false }) {
   const { t } = useCopy();
   return (
@@ -388,6 +398,7 @@ export function Contact({ compact = false }) {
             {t.email}
             <ArrowUpRight size={17} />
           </a>
+          <PhoneContacts />
         </div>
       ) : (
         <>
@@ -403,6 +414,7 @@ export function Contact({ compact = false }) {
               <Mail />
               {config.email}
             </a>
+            <PhoneContacts />
             <a className="button" href={"mailto:" + config.email}>
               {t.email}
               <ArrowUpRight size={18} />
