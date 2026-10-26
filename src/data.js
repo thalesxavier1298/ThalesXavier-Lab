@@ -292,8 +292,11 @@ export const education = [
   },
   {
     name: "Southwestern Christian University",
-    date: "2024–2025",
-    title: bi("Undergraduate Studies", "Estudos de graduação"),
+    date: bi("2024–2025 · One year of studies", "2024–2025 · Um ano de estudos"),
+    title: bi(
+      "Undergraduate Studies in Business Administration",
+      "Estudos de graduação em Business Administration",
+    ),
     details: bi(
       "Student-athlete, men’s soccer. Member of a junior varsity soccer tournament championship team.",
       "Estudante-atleta de futebol masculino. Integrante de equipe campeã de torneio de futebol junior varsity.",
