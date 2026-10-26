@@ -1,0 +1,15 @@
+Jarvis: Skybound — first playable version
+
+To add to ThalesXavier-Lab:
+1. Extract this archive into your repository root, preserving folders.
+2. It adds public/jarvis, scripts/test-jarvis.mjs and JARVIS.md, and updates src/pages/pages.jsx.
+3. Run npm ci, node scripts/test-jarvis.mjs, and npm run build.
+4. Preview with npm run dev and open /projects, then click Play Jarvis.
+5. Commit the changes and deploy through your existing website process.
+
+The updated Projects page is based on commit 307c95f7a2407dd7ed3fa0983660242363a020c8.
+If it has changed since then, apply the accompanying patch or copy the Jarvis feature article into the current Projects component.
+The game is available at /jarvis/ after deployment. No new dependencies or backend are required.
+Production build and automated logic checks passed. Browser map/start/move/pickup/pause smoke tests passed.
+All 17 stages still need a full human playthrough and real-device difficulty/touch checks.
+GitHub publication was blocked by integration permissions; this archive has not been deployed.
