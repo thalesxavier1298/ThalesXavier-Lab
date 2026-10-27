@@ -1,6 +1,6 @@
 // World units remain compatible with the original 960 x 540 levels.
 export const PHYSICS = Object.freeze({
- walkSpeed:210, runSpeed:330, acceleration:1450, airAcceleration:1050,
+ walkSpeed:210, crawlSpeed:70, runSpeed:330, acceleration:1450, airAcceleration:1050,
  friction:1650, iceFriction:620, gravity:1450, maxFall:850,
  jumpSpeed:610, jumpCut:220, coyoteTime:.1, jumpBuffer:.1,
  invincibility:1.6, transformDuration:.5, damageDuration:.32,

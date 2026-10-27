@@ -1,5 +1,5 @@
 import {PHYSICS as C,STATES} from './config.mjs';
-import {resizeFeet,moveBody,approach} from './physics.mjs';
+import {resizeFeet,moveBody,approach,solidsFor} from './physics.mjs';
 export const special=s=>s!==STATES.SMALL&&s!==STATES.SUPER;
 export function createPlayer(x=80,y=360){
  return {x,y,w:C.width,h:C.smallHeight,vx:0,vy:0,state:STATES.SMALL,power:'none',
@@ -30,7 +30,7 @@ function animation(p,dt){
  if(next!==p.anim){p.anim=next;p.animTime=0}else p.animTime+=dt;
 }
 export function stepPlayer(p,input,dt,level,clouds,onHead=()=>{}){
- const solids=[...level.platforms,...(level.blocks||[])].filter(b=>!b.broken);
+ const solids=solidsFor(level);
  p.inv=Math.max(0,p.inv-dt);p.cool=Math.max(0,p.cool-dt);
  p.transform=Math.max(0,p.transform-dt);p.damage=Math.max(0,p.damage-dt);p.landing=Math.max(0,p.landing-dt);
  if(p.pending)transformPlayer(p,p.pending,solids);
@@ -42,7 +42,7 @@ export function stepPlayer(p,input,dt,level,clouds,onHead=()=>{}){
  p.coyote=wasGround?C.coyoteTime:Math.max(0,p.coyote-dt);
  let jumped=false;
  if(p.buffer>0&&p.coyote>0&&!p.crouch){p.vy=-C.jumpSpeed;p.buffer=0;p.coyote=0;p.ground=false;jumped=true}
- const axis=p.crouch?0:input.axis,top=input.run?C.runSpeed:C.walkSpeed;
+ const axis=input.axis,top=p.crouch?C.crawlSpeed:input.run?C.runSpeed:C.walkSpeed;
  const accel=axis?(wasGround?C.acceleration:C.airAcceleration):(level.theme==='frost'&&wasGround?C.iceFriction:C.friction);
  p.vx=approach(p.vx,axis*top,accel*dt);
  if(axis)p.face=axis;
