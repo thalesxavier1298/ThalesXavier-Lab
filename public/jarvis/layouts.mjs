@@ -8,7 +8,7 @@ const spikes=(x,y,w=40)=>({kind:'spikes',x,y,w,h:14});
 const flame=(x,y,offset=0)=>({kind:'flame',x,y,w:36,h:52,period:6,warning:.9,active:1.15,offset});
 const enemy=(x,top,min,max,vx=42)=>({x,y:top-32,w:30,h:32,min,max,vx,frozen:0,alive:true});
 const cp=(x,top)=>({x,y:top-28,top});
-const station=(x,top,power)=>({x:x-16,y:top-104,w:32,h:32,kind:'item',power,reusable:true,used:false,broken:false,bump:0});
+const station=(x,top,power)=>({x:x-16,y:top-104,w:32,h:32,kind:'item',power,used:false,broken:false,bump:0});
 export const DESIGNS=[
  {id:'meadow',identity:'First steps',mechanic:'Fundamentals',width:2500,
  intro:'Short hops over a forgiving first gap.',development:'Try the upper coin trail and a single patrol.',final:'Two wider gaps separated by a rest island.',optional:'Fire makes the patrol optional.',power:'fire',checkpoint:cp(1150,470),
@@ -33,11 +33,11 @@ export const DESIGNS=[
  enemies:[enemy(2410,470,2370,2500)],
  signs:[[220,470,'BRAMBLES HURT: HOP OVER'],[1060,470,'REST BEFORE THE NEXT PATCH'],[1990,470,'PRECISION, NOT SPEED']]},
  {id:'cloudsteps',identity:'Clouds above the cliffs',mechanic:'Cloud power and optional height',width:2500,
- intro:'Collect cloud power from the refill block.',development:'Build temporary steps to a high coin trail.',final:'Choose ground hops or the upper cloud route.',optional:'The upper terraces reward cloud placement; the ground route needs no power.',power:'cloud',checkpoint:cp(1510,470),
+ intro:'Find cloud power in the item boxes.',development:'Build temporary steps to a high coin trail.',final:'Choose ground hops or the upper cloud route.',optional:'The upper terraces reward cloud placement; the ground route needs no power.',power:'cloud',checkpoint:cp(1510,470),
  platforms:[g(0,480),g(560,360),g(1000,360),g(1440,440),g(1960,540),p(650,260,180),p(1100,180,160),p(1550,260,180),p(2060,300,170)],
  stations:[[340,470],[1560,470],[2100,470]],
  enemies:[enemy(1190,470,1130,1260)],
- signs:[[160,470,'REFILL CLOUDS AT THE ? BLOCK'],[580,470,'X CREATES A CLOUD STEP'],[1460,470,'LOW ROUTE NEEDS NO POWER']]},
+ signs:[[160,470,'ONE ITEM PER ? BLOCK'],[580,470,'X CREATES A CLOUD STEP'],[1460,470,'LOW ROUTE NEEDS NO POWER']]},
  {id:'cavern',identity:'Crystal passageways',mechanic:'Low passages and alternate routes',width:2500,
  intro:'A low tunnel with an overhead alternative.',development:'Crawl as Super; Small can walk through.',final:'A second tunnel and a normal final gap.',optional:'Hammer provides a different attack angle from the high route.',power:'hammer',checkpoint:cp(1740,470),
  platforms:[g(0,900),g(980,620),g(1680,820),p(380,300,380,138),p(250,390,100),p(1100,300,360,138),p(970,390,100),p(1910,370,170)],
@@ -67,7 +67,7 @@ export const DESIGNS=[
  enemies:[enemy(2710,470,2660,2810)],
  signs:[[280,470,'VENT: DARK = SAFE, GOLD = WARNING'],[880,470,'RED = ACTIVE. WAIT HERE.'],[1730,470,'READ THE NEXT CYCLE']]},
  {id:'hammerridge',identity:'Attack from an angle',mechanic:'Height and hammer arcs',width:2900,
- intro:'Refill hammer power on the approach.',development:'Face patrols on ledges at different heights.',final:'Choose a low path or throw from the high ledge.',optional:'Hammer clears upper patrols, but every enemy can be jumped or avoided.',power:'hammer',checkpoint:cp(1640,470),
+ intro:'Find hammer power on the approach.',development:'Face patrols on ledges at different heights.',final:'Choose a low path or throw from the high ledge.',optional:'Hammer clears upper patrols, but every enemy can be jumped or avoided.',power:'hammer',checkpoint:cp(1640,470),
  platforms:[g(0,440),p(520,390,240),p(840,310,240),p(1160,390,300),g(1540,1360),p(1770,390,110),p(1930,320,240),p(2270,390,170)],
  stations:[[280,470],[1670,470]],
  enemies:[enemy(935,310,890,1000,-50),enemy(1280,390,1230,1360),enemy(2020,320,1980,2090),enemy(2650,470,2600,2740)],
@@ -104,9 +104,15 @@ export const DESIGNS=[
 export function authorLevel(design){
  const d=structuredClone(design);
  const platforms=d.platforms;
- const blocks=[station(180,470,d.power),station(d.checkpoint.x+70,d.checkpoint.top,d.power),
- station(d.width-200,470,d.power),{x:260,y:348,w:32,h:32,kind:'brick',broken:false,bump:0}];
- for(const [x,top] of d.stations||[])blocks.push(station(x,top,d.power));
+ const checkpoints=[{id:'start',x:80,y:442,top:470},{id:'mid',...d.checkpoint},...(d.extraCheckpoints||[]).map((c,i)=>({id:'rest-'+i,...c}))];
+ const blocks=[station(144,470,d.power),station(216,470,d.power),station(d.checkpoint.x+45,d.checkpoint.top,d.power),
+ {x:260,y:348,w:32,h:32,kind:'brick',broken:false,bump:0}];
+ const overlaps=(a,b)=>a.x<b.x+b.w&&a.x+a.w>b.x&&a.y<b.y+b.h&&a.y+a.h>b.y;
+ const addBox=(x,top)=>{const b=station(x,top,d.power);if(!platforms.some(t=>overlaps(b,t))&&!blocks.some(t=>overlaps(b,t)))blocks.push(b)};
+ addBox(d.checkpoint.x+98,d.checkpoint.top);
+ for(const c of d.extraCheckpoints||[]){addBox(c.x+45,c.top);addBox(c.x+98,c.top)}
+ addBox(d.width-200,470);
+ for(const [x,top] of d.stations||[])addBox(x,top);
  // Marked ledges carry deliberate coin trails, not a uniform line across the world.
  const coins=[];
  for(const b of platforms.filter(b=>b.h<40))for(let x=b.x+30;x<b.x+b.w-15;x+=38)coins.push({x,y:b.y-30,taken:false});
@@ -115,6 +121,6 @@ export function authorLevel(design){
  const falling=(d.falling||[]).map((b,i)=>({...b,id:'fall-'+i,originX:b.x,originY:b.y,state:'ready',timer:0,vy:0,kind:'falling'}));
  const hazards=(d.hazards||[]).map(b=>({...b,state:b.kind==='spikes'?'active':'off'}));
  return {...d,platforms,blocks,coins,moving,falling,hazards,enemies:d.enemies||[],signs:d.signs.map(([x,y,label])=>({x,y,label})),
- checkpoints:[{id:'start',x:80,y:442,top:470},{id:'mid',...d.checkpoint}],
+ checkpoints,
  pickups:blocks.filter(b=>b.kind==='item').map(b=>({x:b.x+16,y:b.y,type:b.power})),chief:null,goal:d.width-120,goalY:470,time:0};
 }

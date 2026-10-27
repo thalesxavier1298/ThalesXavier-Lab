@@ -5,7 +5,7 @@ import {intersects,canFit} from '../public/jarvis/physics.mjs';
 import {createPlayer,stepPlayer,transformPlayer} from '../public/jarvis/player.mjs';
 import {PHYSICS as C,STATES} from '../public/jarvis/config.mjs';
 import {activateBlock,stepItems} from '../public/jarvis/items.mjs';
-import {stepWorld,solidsFor,hazardState,checkpointReached,resetWorld,refillBlocks} from '../public/jarvis/world.mjs';
+import {stepWorld,solidsFor,hazardState,checkpointReached,resetWorld} from '../public/jarvis/world.mjs';
 let count=0;const test=(name,fn)=>{fn();count++;console.log('PASS '+name)};
 const neutral={axis:0,jump:false,held:false,run:false,down:false};
 function stand(x,top){const p=createPlayer(x,top-28);p.ground=true;return p}
@@ -14,7 +14,7 @@ test('15 authored, distinct layouts with explicit identities and two preserved b
  assert.equal(DESIGNS.length,15);assert.equal(new Set(DESIGNS.map(d=>d.mechanic)).size,15);
  assert.equal(new Set(DESIGNS.map(d=>JSON.stringify(d.platforms))).size,15);
  for(let i=0;i<17;i++){const l=makeLevel(i);assert(l.identity&&l.mechanic);assert(l.checkpoints.length>=2);assert.equal(l.index,i)}
- for(const i of [8,16]){const l=makeLevel(i);assert.equal(l.chief.hp,i===8?6:10);assert.equal(l.width,2200)}
+ for(const i of [8,16]){const l=makeLevel(i);assert.equal(l.chief.hp,i===8?6:10);assert.equal(l.width,i===8?5600:8100)}
 });
 test('every checkpoint is grounded, clear, away from hazards and enemies; no block overlaps terrain',()=>{
  for(let i=0;i<17;i++){
@@ -102,20 +102,22 @@ test('checkpoint activation requires standing at the configured location and hei
  assert.equal(checkpointReached(l,p,0),1);p.ground=false;assert.equal(checkpointReached(l,p,0),0);
  p.ground=true;p.y=442;assert.equal(checkpointReached(l,p,0),0);
 });
-test('all returns restart cycles and objects, provide a reachable mushroom and refill blocks',()=>{
+test('all returns restart cycles and objects, provide empty boxes instead of automatic mushrooms',()=>{
  for(let i=0;i<17;i++){
   let l=makeLevel(i);for(const b of l.blocks)b.used=true;for(const b of l.falling)b.state='falling';l.time=5;
   l=makeLevel(i);const {spawn,items}=resetWorld(l,1),c=l.checkpoints[1];
-  assert.equal(spawn.y,c.top-28);assert.equal(items[0].type,'super');assert(!l.blocks.some(b=>b.used));assert(l.falling.every(b=>b.state==='ready'));
-  assert(!l.platforms.some(b=>intersects(items[0],b)));
+  assert.equal(spawn.y,c.top-28);assert.equal(items.length,0);assert(!l.blocks.some(b=>b.used));assert(l.falling.every(b=>b.state==='ready'));
+  assert(l.blocks.some(b=>b.kind==='item'&&Math.abs(b.x-c.x)<120));
  }
 });
-test('reusable power block offers mushroom first, then its configured special; lost items do not softlock',()=>{
+test('each power box stays spent; Small gets a mushroom and large gets the stage power',()=>{
  const l=makeLevel(4),b=l.blocks[0],p=stand(b.x,470),items=[];
  activateBlock(b,p,items);assert.equal(items[0].type,'super');
- items[0].taken=true;transformPlayer(p,STATES.SUPER,solidsFor(l));refillBlocks(l,p,items,2);assert(!b.used);
- activateBlock(b,p,items);assert.equal(items.at(-1).type,'cloud');
- items.at(-1).taken=true;refillBlocks(l,p,items,2);assert(!b.used);
+ items[0].taken=true;transformPlayer(p,STATES.SUPER,solidsFor(l));
+ for(let n=0;n<1500;n++)stepWorld(l,p,C.fixedStep);
+ assert(b.used);assert(!activateBlock(b,p,items));assert.equal(items.length,1);
+ activateBlock(l.blocks[1],p,items);assert.equal(items[1].type,'cloud');
+ assert.equal(makeLevel(4).blocks[0].used,false);
 });
 test('Super can crawl through the crystal passage and stand after leaving it',()=>{
  const l=makeLevel(5),p=stand(350,470);transformPlayer(p,STATES.SUPER,solidsFor(l));
@@ -126,4 +128,4 @@ test('moving and falling platform instances do not leak state between stage load
  const a=makeLevel(13),b=makeLevel(13);a.moving[0].x=9999;assert.notEqual(b.moving[0].x,9999);
  const c=makeLevel(7),d=makeLevel(7);c.falling[0].state='falling';assert.equal(d.falling[0].state,'ready');
 });
-console.log(count+' Checkpoint 2 test groups passed.');
+console.log(count+' world-mechanic test groups passed.');

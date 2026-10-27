@@ -1,5 +1,4 @@
 import {intersects,canFit,moveBody,solidsFor} from './physics.mjs';
-import {createItem} from './items.mjs';
 export {solidsFor} from './physics.mjs';
 export function hazardState(h,time){
  if(h.kind==='spikes')return 'active';
@@ -57,14 +56,6 @@ export function resetWorld(level,checkpointIndex){
  // Build a fresh level through the caller: layout and cycles must restart, not
  // preserve used blocks, active vents or absent temporary platforms after death.
  const cp=level.checkpoints[checkpointIndex]||level.checkpoints[0];
- const items=[createItem('super',cp.x+72,cp.top-30,{emerge:true})];
+ const items=[];
  return {spawn:{x:cp.x,y:cp.top-28},items};
-}
-export function refillBlocks(level,p,items,dt){
- for(const b of level.blocks||[]){
-  if(!b.reusable||!b.used)continue;
-  b.refill=Math.max(0,(b.refill||0)-dt);
-  const nearby=items.some(item=>!item.taken&&Math.abs(item.x-(b.x+16))<230&&Math.abs(item.y-b.y)<250);
-  if(b.refill===0&&!nearby)b.used=false;
- }
 }

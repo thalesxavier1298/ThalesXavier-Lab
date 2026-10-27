@@ -1,5 +1,5 @@
 import {PHYSICS as C,STATES} from './config.mjs';
-import {moveBody,intersects} from './physics.mjs';
+import {moveBody,intersects,solidsFor} from './physics.mjs';
 import {transformPlayer} from './player.mjs';
 export function createItem(type,x,y,{emerge=false}={}){
  return {type,x:x-14,y:y-28,w:28,h:28,vx:type==='super'?C.mushroomSpeed:0,vy:0,originY:y-28,emerge:emerge?.35:0,age:0,taken:false};
@@ -12,7 +12,7 @@ export function activateBlock(block,p,items){
  return true;
 }
 export function stepItems(items,dt,level,p,onCollect=()=>{}){
- const solids=[...level.platforms,...level.blocks].filter(b=>!b.broken);
+ const solids=solidsFor(level);
  for(const item of items){
   if(item.taken)continue;item.age+=dt;
   if(item.emerge>0){item.emerge=Math.max(0,item.emerge-dt);continue}

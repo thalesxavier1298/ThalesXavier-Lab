@@ -1,14 +1,16 @@
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer} from '../public/jarvis/run.mjs';
 import vm from 'node:vm';
 import {PHYSICS as C,STATES,STATE_COLORS} from '../public/jarvis/config.mjs';
 import {intersects,canFit,resizeFeet,moveBody} from '../public/jarvis/physics.mjs';
 import {createPlayer,transformPlayer,damagePlayer,stepPlayer} from '../public/jarvis/player.mjs';
 import {createItem,activateBlock,stepItems} from '../public/jarvis/items.mjs';
 import {spriteMask,drawSprite,drawItem} from '../public/jarvis/sprites.mjs';
-import {background,terrain,drawBlocks} from '../public/jarvis/rendering.mjs';
+import {background,terrain,drawBlocks,drawMechanics} from '../public/jarvis/rendering.mjs';
 import {STAGES,makeLevel,overlap,readProgress,POWERS} from '../public/jarvis/levels.mjs';
-let count=0;function test(name,fn){fn();count++;console.log('PASS '+name)}
+import {stepWorld,checkpointReached,resetWorld,solidsFor,hazardState} from '../public/jarvis/world.mjs';
+let prepare=()=>{};let count=0;function test(name,fn){prepare();fn();count++;console.log('PASS '+name)}
 const floor={x:-100,y:470,w:20000,h:100};
 const flat={width:20000,theme:'meadow',platforms:[floor],blocks:[]};
 const neutral={axis:0,jump:false,held:false,run:false,down:false};
@@ -104,10 +106,11 @@ test('all sprite masks and animation poses stay valid',()=>{
   for(const row of spriteMask(big,pose,f)){assert.equal(row.length,16);assert(!/[^.AHKS CBDT]/.test(row))}
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
-node('game').getContext=()=>new Proxy({createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
+prepare=()=>run('resetLives(runState)');
 test('actual game integration: blocks, five powers and form damage',()=>{
  run('start(0);p.inv=0');
  run('bumpBlock(level.blocks[0])');assert.equal(run('items.at(-1).type'),'super');
@@ -132,6 +135,91 @@ test('both boss gates, victory persistence, retry and pause survive integration'
 test('all 17 stages render every form and support fixed-step simulation',()=>{
  for(let i=0;i<17;i++){run('start('+i+');for(let n=0;n<100;n++)update(1/120);draw()');assert.equal(run('mode'),'play');assert.equal(run('p.y+p.h'),470);
   for(const state of Object.values(STATES))run('transformPlayer(p,STATES.'+state+',level.platforms);draw()');
+ }
+});
+test('world hazards use the same SMALL death and powered damage rules',()=>{
+ run('start(10);p.x=level.hazards[0].x;p.y=442;p.inv=0;level.time=5;update(1/120)');
+ assert.equal(run('mode'),'dying');
+ run('start(10);transformPlayer(p,STATES.FIRE,solidsFor(level));p.x=level.hazards[0].x;p.y=422;p.inv=0;level.time=5;update(1/120)');
+ assert.equal(run('p.state'),'SUPER');assert.equal(run('mode'),'play');
+});
+test('actual retry restores the authored checkpoint, fresh rails and supply blocks',()=>{
+ run('start(13);checkpoint=1;level.moving[0].progress=.7;level.time=5;level.blocks[0].used=true;die();deathScreen()');
+ node('continue').onclick();
+ assert.equal(run('checkpoint'),1);assert.equal(run('p.x'),run('level.checkpoints[1].x'));
+ assert.equal(run('p.y+p.h'),run('level.checkpoints[1].top'));assert.equal(run('p.state'),'SMALL');
+ assert.equal(run('level.time'),0);assert.equal(run('level.moving[0].progress'),0);assert.equal(run('level.blocks[0].used'),false);
+ assert.equal(run('items.length'),0);
+});
+test('the first gap is reachable with the actual player integrator in both sizes',()=>{
+ for(const state of [STATES.SMALL,STATES.SUPER]){
+  const l=makeLevel(0),p=createPlayer(430,442);p.ground=true;transformPlayer(p,state,solidsFor(l));p.vx=330;
+  stepPlayer(p,{axis:1,run:true,jump:true,held:true,down:false},1/120,l,[]);
+  for(let n=0;n<110;n++)stepPlayer(p,{axis:1,run:true,jump:false,held:true,down:false},1/120,l,[]);
+  assert(p.x>=600&&p.y+p.h<=470);
+ }
+});
+test('first authored stage can be completed with a scripted sequence of normal inputs',()=>{
+ storage.clear();run('unlocked=0;start(0)');
+ function drive(target,jump=false){
+  run("keys.clear();keys.add('ShiftLeft');keys.add('ArrowRight');"+(jump?"keys.add('Space');pressed.add('Space');":""));
+  for(let n=0;n<800&&run('mode')==='play'&&run('p.x')<target;n++)run('update(1/120)');
+  assert(!['dead','dying'].includes(run('mode')),'died before '+target+' at '+run('p.x'));
+ }
+ function settle(){run('keys.clear()');for(let n=0;n<300&&run('mode')==='play';n++){run('update(1/120)');if(n>40&&run('p.ground')&&run('p.vx')===0)break}} drive(430);drive(700,true);settle();drive(730);drive(890,true);settle();drive(1200,true);settle();
+ drive(1470);drive(1710,true);settle();drive(1900);drive(2100,true);settle();drive(2160);drive(2400,true);settle();drive(2820);drive(3060,true);settle();drive(3200);
+ assert.equal(run('mode'),'won');assert.equal(storage.get('jarvis-skybound-v1'),'1');assert.equal(run('unlocked'),1);assert(run('remaining')>150);
+});
+test('no item is spawned automatically at any stage entry or checkpoint',()=>{
+ for(let i=0;i<17;i++){
+  run('start('+i+')');assert.equal(run('items.length'),0);
+  for(let c=1;c<run('level.checkpoints.length');c++){run('checkpoint='+c+';respawn()');assert.equal(run('items.length'),0)}
+ }
+});
+test('five deaths consume exactly five lives and produce Game Over without clearing unlocks',()=>{
+ run('start(3);checkpoint=1');const progress=run('unlocked');
+ for(let n=4;n>=0;n--){
+  run('p.y=700;update(1/120)');assert.equal(run('runState.lives'),n);run('die()');assert.equal(run('runState.lives'),n);
+  run('deathScreen()');assert.equal(run('mode'),n===0?'gameover':'dead');
+  if(n>0){node('continue').onclick();assert.equal(run('checkpoint'),1);assert.equal(run('p.state'),'SMALL');assert.equal(run('items.length'),0)}
+ }
+ assert.equal(run('unlocked'),progress);
+ assert.equal(readRun({getItem:k=>storage.get(k)??null}).lives,0);
+ node('continue').onclick();assert.equal(run('runState.lives'),5);assert.equal(run('checkpoint'),0);assert.equal(run('mode'),'play');
+ assert.equal(run('remaining'),makeLevel(3).timeLimit);assert.equal(run('unlocked'),progress);
+});
+test('time expires once regardless of power/invincibility; retry restores a generous full timer',()=>{
+ run('start(4);checkpoint=1;transformPlayer(p,STATES.CLOUD,solidsFor(level));p.inv=999;remaining=.001;update(1/120)');
+ assert.equal(run('mode'),'dying');assert.equal(run('remaining'),0);assert.equal(run('deathReason'),'timeout');assert.equal(run('runState.lives'),4);
+ run('die()');assert.equal(run('runState.lives'),4);run('deathScreen()');node('continue').onclick();
+ assert.equal(run('checkpoint'),1);assert.equal(run('remaining'),makeLevel(4).timeLimit);assert.equal(run('p.state'),'SMALL');
+});
+test('the real frame loop freezes time on pause and after a clear',()=>{
+ run('start(0);remaining=20;pause();last=0;frame(100);frame(5000)');
+ assert.equal(run('remaining'),20);run('pause();frame(5100)');assert(run('remaining')<20);
+ run("mode='won';frame(7000)");const remaining=run('remaining');run('frame(9000)');assert.equal(run('remaining'),remaining);
+});
+test('changing stages or restarting does not silently refill lives',()=>{
+ run('start(0);p.y=700;update(1/120);deathScreen()');node('continue').onclick();assert.equal(run('runState.lives'),4);
+ run('start(2)');assert.equal(run('runState.lives'),4);assert.equal(run('remaining'),makeLevel(2).timeLimit);
+});
+test('saved life data is validated independently of completed stages',()=>{
+ assert.equal(readRun({getItem:()=>'{bad json'}).lives,5);
+ assert.equal(readRun({getItem:()=>JSON.stringify({lives:-1,stage:0})}).lives,5);
+ assert.equal(readRun({getItem:()=>JSON.stringify({lives:0,stage:16})}).lives,0);
+ assert.equal(readRun({getItem:()=>JSON.stringify({lives:3,stage:8})}).lives,3);
+ assert.equal(readRun({getItem(){throw Error()}}).lives,5);
+ const r={lives:2,stage:4};assert.doesNotThrow(()=>saveRun(r,{setItem(){throw Error()}}));
+});
+test('stage widths rise gradually, timers allow ample exploration, and all return boxes are single-use',()=>{
+ let prior=0;
+ for(let i=0;i<17;i++){
+  const l=makeLevel(i);assert(l.width>prior);prior=l.width;
+  assert(l.timeLimit>=300&&l.timeLimit<=480);assert(l.timeLimit>l.width/210+120);
+  for(const c of l.checkpoints){
+   assert(l.blocks.filter(b=>b.kind==='item'&&b.x>=c.x&&b.x<c.x+140&&Math.abs(b.y-(c.top-104))<1).length>=2 || c.id==='start');
+  }
+  assert(l.blocks.every(b=>!b.reusable));
  }
 });
 console.log(count+' test groups passed.');
