@@ -1,3 +1,4 @@
+import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from './map.mjs';
 import {STAGES,makeLevel,overlap,readProgress} from './levels.mjs';
 import {PHYSICS,STATES} from './config.mjs';
 import {createPlayer,stepPlayer,damagePlayer,transformPlayer} from './player.mjs';
@@ -10,7 +11,7 @@ const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('
 let unlocked;try{unlocked=readProgress(localStorage)}catch{unlocked=0}
 let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],particles=[],camera=0,mode='map',last=0,clock=0,score=0,checkpoint=0,sound=false,audio=null,items=[],deathTimer=0,accumulator=0;
 let runState;try{runState=readRun(localStorage)}catch{runState={lives:INITIAL_LIVES,stage:0}}
-let remaining=0,deathReason='hit';
+let remaining=0,deathReason='hit',mapIndex=0,mapTravel=null,entryHeld=false;
 function persistRun(){try{saveRun(runState,localStorage)}catch{}}
 ctx.imageSmoothingEnabled=false;
 const colors={super:'#a3e477',cloud:'#eef8ff',fire:'#ff9a58',ice:'#8ce5ff',hammer:'#d8b6ff',helicopter:'#f5d977',none:'#8bd7c0'};
@@ -18,20 +19,32 @@ function tone(freq=440,duration=.08){if(!sound)return;try{audio??=new AudioConte
 $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'Sound on':'Sound off';$('sound').setAttribute('aria-pressed',sound);tone()};
 function renderMap(){
  $('progress').textContent=Math.min(unlocked,17)+' / 17 cleared · Lives '+runState.lives;
- const coords=STAGES.map((s,i)=>({x:65+(i%6)*(830/5),y:90+Math.floor(i/6)*135}));
- // Reverse the middle row to make one continuous trail.
- for(let i=6;i<12;i++)coords[i].x=895-(i%6)*(830/5);
+ const coords=MAP_POINTS;
  const route=coords.map(v=>v.x+','+v.y).join(' ');
- $('island-map').innerHTML='<svg viewBox="0 0 960 445" role="group" aria-label="World map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".25"/></filter></defs><path d="M30 60 Q200 -5 370 65 T730 55 Q960 10 930 240 Q970 430 730 410 Q510 475 330 405 Q20 460 20 250Z" fill="#477265" opacity=".5"/><path d="M40 65 Q270 15 445 72 T910 76" fill="none" stroke="#8cb58b" stroke-width="2" opacity=".25"/><polyline points="'+route+'" fill="none" stroke="#102e3b" stroke-width="14" stroke-linejoin="round"/><polyline points="'+route+'" fill="none" stroke="#6b938b" stroke-width="3" stroke-dasharray="5 9"/>'+STAGES.map((s,i)=>{
+ $('island-map').innerHTML='<svg viewBox="0 0 960 540" role="group" aria-label="World map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".25"/></filter></defs><path d="M20 20H940V510H20Z" fill="#477265" opacity=".5"/><path d="M40 65 Q270 15 445 72 T910 76" fill="none" stroke="#8cb58b" stroke-width="2" opacity=".25"/><polyline points="'+route+'" fill="none" stroke="#102e3b" stroke-width="14" stroke-linejoin="round"/><polyline points="'+route+'" fill="none" stroke="#6b938b" stroke-width="3" stroke-dasharray="5 9"/>'+STAGES.map((s,i)=>{
  const {x,y}=coords[i],locked=i>unlocked,done=i<unlocked,label=s.boss?(i===8?'TOWER':'CASTLE'):String(i>8?i:i+1).padStart(2,'0');
- return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(s.boss?'<g transform="translate('+(x-42)+' '+(y-91)+')" aria-hidden="true"><path d="'+(i===8?'M20 64V12H12V0H26V8H38V0H52V8H66V0H78V12H70V64Z':'M0 64V24H12V10H4V0H20V8H30V0H46V24H58V0H74V8H84V0H100V10H92V64Z')+'" fill="#71849b" stroke="#e5d5aa" stroke-width="3"/><path d="M34 64V44Q45 26 56 44V64" fill="#192539"/><path d="M40 18H48V30H40Z" fill="#ffd27d"/></g>':'')+(i===unlocked?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
- }).join('')+'</svg>';
- document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(i<=unlocked)start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}});
+ return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
+ }).join('')+'<g id="map-jarvis" aria-hidden="true" transform="translate('+coords[mapIndex].x+' '+(coords[mapIndex].y-18)+')">'+MAP_JARVIS+'</g></svg>';
+ $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter';
+ document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(i<=unlocked)start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();entryHeld=e.key===' ';go()}}});
 }
-function showMap(){mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
+function walkMap(key){if(mode!=='map'||mapTravel)return;const next=mapNeighbor(mapIndex,key,unlocked);if(next!==mapIndex)mapTravel={from:mapIndex,to:next,t:0}}
+function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel){entryHeld=holdSpace;start(mapIndex)}}
+for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map-up','ArrowUp'],['map-down','ArrowDown']])$(id).onclick=()=>walkMap(key);
+$('map-enter').onclick=()=>enterMap();
+function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;$('map-selected').textContent=STAGES[mapIndex].name+' — Space to enter'}}
+function showMap(){$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
-$('reset').onclick=()=>{if(confirm('Reset all Jarvis stage progress on this device?')){unlocked=0;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){level=makeLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();checkpoint=0;score=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+function retryCloudTrial(){
+ if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
+ const trial=[...level.cloudTrials].reverse().find(t=>p.x>=t.start-24);if(!trial)return;
+ checkpoint=trial.checkpoint;level=makeLevel(level.index);runState.state=STATES.SMALL;persistRun();respawn();mode='play';$('overlay').hidden=true;$('pause').textContent='Pause';canvas.focus();
+ $('status').textContent='Cloud trial restarted. Collect the two separated supplies. No life lost.';
+}
+$('cloud-retry').onclick=retryCloudTrial;
+
+$('reset').onclick=()=>{if(confirm('Reset all Jarvis stage progress on this device?')){unlocked=0;mapIndex=0;mapTravel=null;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
+function start(i){level=makeLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
 function respawn(state=STATES.SMALL){
  const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;transformPlayer(p,state,solidsFor(level),{animate:false});p.inv=PHYSICS.invincibility;
  shots=[];clouds=[];particles=[];items=fresh.items;remaining=level.timeLimit;
@@ -84,14 +97,16 @@ function update(dt){
  stepWorld(level,p,dt);
  const oldY=p.y;
  const input={
- jump:pressed.has('Space')||pressed.has('KeyW')||pressed.has('ArrowUp'),
- held:keys.has('Space')||keys.has('KeyW')||keys.has('ArrowUp'),
+ jump:!entryHeld&&pressed.has('Space')||pressed.has('KeyW')||pressed.has('ArrowUp'),
+ held:!entryHeld&&keys.has('Space')||keys.has('KeyW')||keys.has('ArrowUp'),
  axis:(keys.has('ArrowRight')||keys.has('KeyD')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyA')?1:0),
  run:keys.has('ShiftLeft')||keys.has('ShiftRight'),
  down:keys.has('ArrowDown')||keys.has('KeyS')
  };
+ if(level.cloudTrials)$('cloud-retry').hidden=!level.cloudTrials.some(t=>p.x>=t.start-24);
  const result=stepPlayer(p,input,dt,level,clouds,bumpBlock);
  if(result.jumped)tone(520);
+ for(const trial of level.cloudTrials||[])if(p.x>=trial.edge-80&&p.x<trial.edge&&p.state!==STATES.CLOUD){p.x=trial.edge-81;p.vx=0;$('status').textContent='Cloud passage: collect the Cloud flower before crossing. C retries this trial.'}
  if(pressed.has('KeyX')||pressed.has('KeyK'))power();
  for(const block of level.blocks)block.bump=Math.max(0,(block.bump||0)-dt);
  for(const b of clouds)b.life-=dt;
@@ -153,6 +168,7 @@ function draw(){
 }
 function frame(t){
  const elapsed=Math.max(0,Math.min((t-last)/1000||0,.1));last=t;
+ if(mode==='map')stepMap(elapsed);
  if(mode==='play'){
  accumulator=Math.min(accumulator+elapsed,.1);
  while(accumulator>=PHYSICS.fixedStep&&mode==='play'){update(PHYSICS.fixedStep);accumulator-=PHYSICS.fixedStep}
@@ -162,9 +178,9 @@ function frame(t){
  }
  if(level&&mode!=='map')draw();requestAnimationFrame(frame);
 }
-document.addEventListener('keydown',e=>{if(mode==='map')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)});
-document.addEventListener('keyup',e=>keys.delete(e.code));
-window.addEventListener('blur',()=>{keys.clear();pressed.clear();if(mode==='play')pause()});
+document.addEventListener('keydown',e=>{if(mode==='map'){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)});
+document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='Space')entryHeld=false});
+window.addEventListener('blur',()=>{entryHeld=false;keys.clear();pressed.clear();if(mode==='play')pause()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='play')pause()});
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
 showMap();requestAnimationFrame(frame);

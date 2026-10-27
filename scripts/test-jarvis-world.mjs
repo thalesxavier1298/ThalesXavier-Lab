@@ -50,9 +50,9 @@ function routeGraph(l){
  const seen=new Set([0]),queue=[0];while(queue.length){const a=queue.shift();for(const b of links[a])if(!seen.has(b)){seen.add(b);queue.push(b)}}
  return {nodes,seen};
 }
-test('all 17 stage goals and safe returns have geometric routes without a required power',()=>{
+test('ordinary routes are connected without powers; mandatory cloud trials tested separately',()=>{
  for(let i=0;i<17;i++){
-  const l=makeLevel(i),{nodes,seen}=routeGraph(l);
+  const full=makeLevel(i),l=full.cloudTrials?{...full,platforms:full.platforms.filter(b=>b.x<full.cloudTrials[0].start),checkpoints:full.checkpoints.filter(c=>c.x<full.cloudTrials[0].start),goal:full.cloudTrials[0].start-120,goalY:470}:full;const {nodes,seen}=routeGraph(l);
   assert(nodes.some((b,n)=>seen.has(n)&&l.goal>=b.x&&l.goal+24<=b.x+b.w&&b.y===l.goalY),i+' goal disconnected');
   for(const c of l.checkpoints)assert(nodes.some((b,n)=>seen.has(n)&&c.x>=b.x&&c.x+24<=b.x+b.w&&b.y===c.top),i+' checkpoint disconnected');
  }
@@ -116,7 +116,7 @@ test('each power box stays spent; Small gets a mushroom and large gets the stage
  items[0].taken=true;transformPlayer(p,STATES.SUPER,solidsFor(l));
  for(let n=0;n<1500;n++)stepWorld(l,p,C.fixedStep);
  assert(b.used);assert(!activateBlock(b,p,items));assert.equal(items.length,1);
- activateBlock(l.blocks[1],p,items);assert.equal(items[1].type,'cloud');
+ activateBlock(l.blocks.find((b,i)=>i>0&&b.content==='power'),p,items);assert.equal(items[1].type,'cloud');
  assert.equal(makeLevel(4).blocks[0].used,false);
 });
 test('Super can crawl through the crystal passage and stand after leaving it',()=>{

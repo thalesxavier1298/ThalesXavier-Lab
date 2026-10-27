@@ -113,7 +113,9 @@ export function authorLevel(design){
  for(const c of d.extraCheckpoints||[]){addBox(c.x+45,c.top);addBox(c.x+98,c.top)}
  addBox(d.width-200,470);
  for(const [x,top] of d.stations||[])addBox(x,top);
- for(const b of blocks)if(b.kind==='item'){b.content=checkpoints.some(c=>b.x>=c.x&&b.x<c.x+140)?'power':'coin'}
+ for(const b of blocks)if(b.kind==='item')b.content=checkpoints.some(c=>Math.abs(b.x-(c.id==='start'?128:c.x+29))<2)?'power':'coin';
+ for(const c of checkpoints){const x=c.x+330,top=c.top;const support=platforms.find(t=>t.y===top&&x-20>=t.x&&x+20<t.x+t.w);if(support){addBox(x,top);const box=blocks.find(b=>Math.abs(b.x-(x-16))<1&&b.y===top-104);if(box)box.content='power'}}
+ if(d.id==='tower'||d.id==='castle'){const x=d.width-660;addBox(x,470);addBox(x+72,470);for(const b of blocks)if(b.x>=x-16&&b.x<=x+72)b.content='power'}
  for(const floor of platforms){
   if(floor.w<650)continue;
   for(let x=floor.x+240;x<floor.x+floor.w-220;x+=180){

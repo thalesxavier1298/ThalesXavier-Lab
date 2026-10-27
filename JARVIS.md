@@ -1,3 +1,3 @@
 # Jarvis Adventure
 
-Versão atual: Checkpoint 4 — Coins & Castles. Veja CHECKPOINT4.md para mudanças, testes e instalação. O jogo permanece em /jarvis/, integrado ao portfólio existente.
+Versão atual: Checkpoint 5 — Walk the Cloud Trail. Veja CHECKPOINT5.md para alterações, validação e instalação. O jogo continua em /jarvis/, dentro do portfólio existente.

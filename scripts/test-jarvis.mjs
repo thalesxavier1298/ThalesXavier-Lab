@@ -1,3 +1,4 @@
+import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from '../public/jarvis/map.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer} from '../public/jarvis/run.mjs';
@@ -19,7 +20,7 @@ const grounded=()=>{const p=createPlayer();p.y=470-p.h;p.ground=true;return p};
 test('17 destinations / 15 regular stages / 2 bosses / all original powers',()=>{
  assert.equal(STAGES.length,17);assert.equal(STAGES.filter(s=>!s.boss).length,15);assert.equal(STAGES.filter(s=>s.boss).length,2);
  assert.deepEqual([...new Set(STAGES.map(s=>s.power))].sort(),[...POWERS].sort());
- for(let i=0;i<17;i++){const l=makeLevel(i);assert.equal(Boolean(l.chief),l.boss);assert(l.platforms.some(b=>b.y===470&&b.x<=l.goal&&b.x+b.w>l.goal))}
+ for(let i=0;i<17;i++){const l=makeLevel(i);assert.equal(Boolean(l.chief),l.boss);assert(l.platforms.some(b=>b.y===l.goalY&&b.x<=l.goal&&b.x+b.w>l.goal))}
 });
 test('progress remains compatible and safe when storage unavailable',()=>{
  assert.equal(readProgress({getItem:()=> '17'}),17);assert.equal(readProgress({getItem:()=> 'NaN'}),0);
@@ -107,14 +108,14 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState)');
 test('actual game integration: blocks, five powers and form damage',()=>{
  run('start(0);p.inv=0');
  run('bumpBlock(level.blocks[0])');assert.equal(run('items.at(-1).type'),'super');
- run('transformPlayer(p,STATES.SUPER,level.platforms);bumpBlock(level.blocks[1])');assert.equal(run('items.at(-1).type'),run('level.blocks[1].power'));
+ run('transformPlayer(p,STATES.SUPER,level.platforms);bumpBlock(level.blocks.find((b,i)=>i>0&&b.content==="power"))');assert.equal(run('items.at(-1).type'),run('level.power'));
  for(const type of ['fire','ice','hammer']){run("transformPlayer(p,STATES."+type.toUpperCase()+",level.platforms);p.cool=0;power()");assert.equal(run('shots.at(-1).type'),type)}
  run('transformPlayer(p,STATES.CLOUD,level.platforms);p.cool=0;power()');assert.equal(run('clouds.length'),1);
  run('transformPlayer(p,STATES.HELICOPTER,level.platforms);p.cool=0;power()');assert.equal(run('p.vy'),-720);
@@ -211,13 +212,13 @@ test('saved life data is validated independently of completed stages',()=>{
  assert.equal(readRun({getItem(){throw Error()}}).lives,5);
  const r={lives:2,stage:4};assert.doesNotThrow(()=>saveRun(r,{setItem(){throw Error()}}));
 });
-test('stage widths rise gradually, timers allow ample exploration, and all return boxes are single-use',()=>{
+test('stage lengths and timers allow exploration; recovery supplies remain single-use',()=>{
  let prior=0;
  for(let i=0;i<17;i++){
-  const l=makeLevel(i);assert(l.width>prior);prior=l.width;
-  assert(l.timeLimit>=300&&l.timeLimit<=480);assert(l.timeLimit>l.width/210+120);
+  const l=makeLevel(i);assert(l.width>=3300);prior=l.width;
+  assert(l.timeLimit>=300&&l.timeLimit<=740);assert(l.timeLimit>l.width/210+120);
   for(const c of l.checkpoints){
-   assert(l.blocks.filter(b=>b.kind==='item'&&b.x>=c.x&&b.x<c.x+140&&Math.abs(b.y-(c.top-104))<1).length>=2 || c.id==='start');
+   assert(l.blocks.some(b=>b.content==='power'&&b.x>=c.x&&b.x<c.x+140&&Math.abs(b.y-(c.top-104))<1));
   }
   assert(l.blocks.every(b=>!b.reusable));
  }
@@ -249,6 +250,54 @@ test('boss landmarks and fortress interiors are distinct; lava instantly kills e
   run('resetLives(runState);start(16);transformPlayer(p,STATES.'+state+',solidsFor(level));p.inv=999;var lava=level.lava[0];p.x=lava.x+40;p.y=lava.y;update(1/120)');
   assert.equal(run('mode'),'dying');assert.equal(run('deathReason'),'lava');assert.equal(run('runState.lives'),4);run('die("lava")');assert.equal(run('runState.lives'),4);
  }
+});
+
+
+test('map arrows follow visual trail bends, respect locks, animate and enter without a jump',()=>{
+ assert.equal(mapNeighbor(5,'ArrowDown',17),6);assert.equal(mapNeighbor(6,'ArrowLeft',17),7);
+ assert.equal(mapNeighbor(11,'ArrowDown',17),12);assert.equal(mapNeighbor(12,'ArrowRight',17),13);
+ assert.equal(mapNeighbor(0,'ArrowRight',0),0);assert.equal(mapNeighbor(0,'ArrowLeft',17),0);
+ assert.deepEqual(mapPosition(0,1,.5),{x:148,y:80});
+ run('unlocked=17;level=null;runState.stage=5;showMap();walkMap("ArrowDown");walkMap("ArrowLeft")');assert.equal(run('mapTravel.to'),6);
+ run('enterMap()');assert.equal(run('mode'),'map');run('stepMap(.4)');assert.equal(run('mapIndex'),6);
+ run('enterMap(true);update(1/120)');assert.equal(run('mode'),'play');assert.equal(run('level.index'),6);assert(run('p.ground'));assert(run('entryHeld'));
+ run('showMap()');assert.equal(run('mapIndex'),6);
+});
+test('single power supplies are separated; adjacent pairs exist only before boss fights',()=>{
+ for(let i=0;i<17;i++){
+  const l=makeLevel(i),boxes=l.blocks.filter(b=>b.content==='power').sort((a,b)=>a.x-b.x);
+  for(let n=1;n<boxes.length;n++){const a=boxes[n-1],b=boxes[n];if(Math.abs(a.y-b.y)<80&&b.x-a.x<200)assert(l.boss&&a.x>=l.width-700&&b.x<l.width-450,i+' unexpected power pair '+a.x+' '+b.x)}
+ }
+});
+test('all mandatory cloud crossings pass the real integrator with two charges and fail without clouds',()=>{
+ for(const index of [3,4,9,15])for(let trialIndex=0;trialIndex<makeLevel(index).cloudTrials.length;trialIndex++){
+  run('start('+index+');var trial=level.cloudTrials['+trialIndex+'];p.x=trial.edge-50;p.y=trial.top-28;p.ground=true;p.vx=330;transformPlayer(p,STATES.CLOUD,solidsFor(level));entryHeld=false');
+  let used=0,spawned=false,reached=false;
+  for(let n=0;n<1000;n++){
+   const jump=run('p.ground&&(p.x>=trial.edge-45)');if(jump)spawned=false;
+   run('keys.clear();keys.add("ShiftLeft");keys.add("ArrowRight");keys.add("Space");'+(jump?'pressed.add("Space");':''));
+   if(!spawned&&used<2&&run('!p.ground&&p.vy>=0')){run('pressed.add("KeyX")');used++;spawned=true}
+   run('update(1/120)');
+   if(run('p.ground&&p.x>=trial.end')){reached=true;break}
+   if(run('mode')!=='play')break;
+  }
+  assert(reached,'cloud crossing '+index+'/'+trialIndex);assert.equal(used,2);assert.equal(run('p.charges'),1);
+  // A full running leap alone cannot span the gap, even with the elevated landing.
+  const l=makeLevel(index),t=l.cloudTrials[trialIndex],p=createPlayer(t.edge-30,t.top-28);p.ground=true;p.vx=330;
+  stepPlayer(p,{axis:1,run:true,jump:true,held:true},1/120,l,[]);
+  for(let n=0;n<250&&p.y<=620;n++)stepPlayer(p,{axis:1,run:true,jump:false,held:true},1/120,l,[]);
+  assert(p.y>620);assert(p.x<t.end);
+ }
+});
+test('cloud supply works after Small death or another saved power; recovery rebuilds used supplies',()=>{
+ for(const state of [STATES.SMALL,STATES.FIRE,STATES.HELICOPTER]){
+  run('start(4);var trial=level.cloudTrials[0];checkpoint=trial.checkpoint;p.x=trial.start+80;p.y=trial.top-28;transformPlayer(p,STATES.'+state+',solidsFor(level));var supply=level.blocks.filter(b=>b.content==="power"&&b.x>trial.start&&b.x<trial.edge);var drops=[];activateBlock(supply[0],p,drops)');
+  assert.equal(run('drops[0].type'),state===STATES.SMALL?'super':'cloud');
+  run('transformPlayer(p,STATES.SUPER,solidsFor(level));activateBlock(supply[1],p,drops)');assert.equal(run('drops[1].type'),'cloud');
+  const lives=run('runState.lives');run('p.charges=0;retryCloudTrial()');assert.equal(run('runState.lives'),lives);assert.equal(run('p.state'),'SMALL');assert.equal(run('items.length'),0);assert.equal(run('p.x'),run('level.checkpoints[checkpoint].x'));
+  assert.equal(run('level.blocks.filter(b=>b.content==="power"&&b.x>trial.start&&b.x<trial.edge).every(b=>!b.used)'),true);
+ }
+ run('start(4);trial=level.cloudTrials[0];p.x=trial.edge-79;p.y=trial.top-48;transformPlayer(p,STATES.HELICOPTER,solidsFor(level));update(1/120)');assert(run('p.x')<run('trial.edge-80'));
 });
 
 console.log(count+' test groups passed.');

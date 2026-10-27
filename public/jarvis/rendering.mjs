@@ -62,6 +62,14 @@ export function drawBlocks(ctx,blocks,time){
 }
 
 export function drawMechanics(ctx,level,player,checkpoint,time){
+ for(const trial of level.cloudTrials||[]){
+  const x=trial.edge-80,y=trial.top;
+  r(ctx,x-6,y-95,12,95,'#88b8ca');r(ctx,x-14,y-100,28,12,'#e5f5ed');
+  r(ctx,x-10,y-114,20,15,'#fff6da');
+  ctx.font='bold 11px monospace';ctx.fillStyle='#fff6da';ctx.textAlign='center';ctx.fillText('CLOUD PASS',x,y-130);
+  // Lit threshold visibly marks the power requirement before the gap.
+  r(ctx,x-2,y-80,4,80,player.state==='CLOUD'?'#9de9cb':'#efbc76');
+ }
  for(const lava of level.lava||[]){
   r(ctx,lava.x,lava.y,lava.w,lava.h,'#bd3b37');
   for(let x=lava.x;x<lava.x+lava.w;x+=16){const wave=Math.sin(time*4+x*.06)*3;r(ctx,x,lava.y+wave,16,8,'#ffbf5f');r(ctx,x,lava.y+10+wave,16,14,'#f47742');}
