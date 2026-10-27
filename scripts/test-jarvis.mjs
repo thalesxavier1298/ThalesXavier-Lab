@@ -1,3 +1,4 @@
+import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,addHiddenBlocks,standsOnBlock} from '../public/jarvis/objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,enemyShot} from '../public/jarvis/encounters.mjs';
 import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from '../public/jarvis/map.mjs';
 import assert from 'node:assert/strict';
@@ -109,7 +110,7 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
@@ -385,4 +386,62 @@ test('every life block has a clear underside and can be hit by Small Jarvis with
   assert(b.used,'unreachable life block '+i);assert.equal(items[0].type,'life');
  }
 });
+
+test('Sentinel rejects Ice but accepts Fire, Hammer and stomps; Storm King rules stay intact',()=>{
+ for(const [index,type,damage] of [[8,'ice',0],[8,'fire',1],[8,'hammer',1],[16,'ice',1]]){
+  run('start('+index+');p.x=level.chief.x-200;p.y=422;p.inv=999;var hp=level.chief.hp;shots.push({x:level.chief.x+20,y:level.chief.y+30,w:16,h:16,vx:0,vy:0,type:"'+type+'",life:1});update(1/120)');
+  assert.equal(run('level.chief.hp'),run('hp')-damage);assert.equal(run('shots.length'),0);assert.equal(run('level.chief.frozen'),undefined);
+ }
+ run('start(8);p.x=level.chief.x+25;p.y=level.chief.y-49;p.h=48;p.state=STATES.SUPER;p.vy=160;p.ground=false;p.inv=0;entryHeld=false;update(1/120)');assert.equal(run('level.chief.hp'),5);
+ run('p.x=level.chief.x-200;p.y=422;shots.push({x:level.chief.x+20,y:level.chief.y+30,w:16,h:16,vx:0,vy:0,type:"fire",life:1});update(1/120)');assert.equal(run('level.chief.hp'),5);
+});
+test('hammer pickup has a dedicated silhouette, not the Ice flower pixel mask',()=>{
+ function pixels(type){const points=[];const ctx={set fillStyle(c){this.c=c},fillRect(x,y,w,h){points.push([x,y,w,h])}};drawItem(ctx,{x:0,y:0,type,taken:false,emerge:0},0);return points}
+ assert.notDeepEqual(pixels('hammer'),pixels('ice'));assert(pixels('hammer').some(p=>p[2]===26&&p[3]===14));
+});
+test('hidden blocks allow side and downward passage; upward head contact reveals one reward',()=>{
+ const l={width:1000,theme:'meadow',platforms:[{x:0,y:470,w:1000,h:100}],blocks:[{x:300,y:360,w:32,h:32,kind:'item',hidden:true,revealed:false,used:false,content:'coin'}],enemies:[]};
+ const b=l.blocks[0];assert(!solidsFor(l).includes(b));
+ const side={x:260,y:365,w:24,h:28,vx:200,vy:0};moveBody(side,.5,solidsFor(l));assert(side.x>332);assert(!b.revealed);
+ const down=createPlayer(304,310);down.vy=300;for(let n=0;n<50;n++)stepPlayer(down,{axis:0,held:false},1/120,l,[],()=>{throw Error('downward reveal')});assert(!b.revealed);assert(down.y>392);
+ const p=createPlayer(304,442);p.ground=true;const items=[];
+ for(let n=0;n<120;n++)stepPlayer(p,{axis:0,jump:n===0,held:true},1/120,l,[],block=>{if(revealBlock(block,l,items))activateBlock(block,p,items)});
+ assert(b.revealed);assert(b.used);assert(solidsFor(l).includes(b));assert.equal(items.length,1);assert.equal(items[0].type,'coin');assert(canFit(p,solidsFor(l)));
+ assert(!activateBlock(b,p,items));assert.equal(items.length,1);
+ const walker={x:260,y:365,w:24,h:28,vx:200,vy:0};moveBody(walker,.5,solidsFor(l));assert.equal(walker.x,276);
+});
+test('hidden reveal refuses overlapping bodies and platforms instead of trapping them',()=>{
+ const b={x:200,y:300,w:32,h:32,hidden:true,revealed:false};const e={x:205,y:305,w:30,h:32,alive:true};
+ const l={enemies:[e],moving:[],falling:[]};assert(!revealBlock(b,l));assert(!b.revealed);e.x=400;
+ l.moving=[{x:201,y:310,w:100,h:20}];assert(!revealBlock(b,l));l.moving=[];
+ assert(!revealBlock(b,l,[{x:202,y:300,w:28,h:28,taken:false}]));assert(revealBlock(b,l,[]));
+});
+test('authored hidden coin blocks are optional, reachable by Small and reset on new attempts',()=>{
+ let total=0;
+ for(let i=0;i<17;i++){
+  const l=makeLevel(i);for(const b of l.blocks.filter(b=>b.hidden)){
+   total++;assert.equal(b.content,'coin');assert(!b.revealed);const top=b.y+110,p=createPlayer(b.x+4,top-28);p.ground=true;const items=[];
+   for(let n=0;n<120;n++)stepPlayer(p,{axis:0,jump:n===0,held:true},1/120,l,[],block=>{if(revealBlock(block,l,items))activateBlock(block,p,items)});
+   assert(b.revealed,'hidden block unreachable '+i);assert.equal(items[0].type,'coin');assert(makeLevel(i).blocks.filter(b=>b.hidden).every(b=>!b.revealed));
+  }
+ }assert(total>=3);assert(makeLevel(0).blocks.some(b=>b.hidden));
+});
+test('block impacts hit only a supported enemy once and respect armor and frozen shattering',()=>{
+ const b={x:100,y:300,w:32,h:32,kind:'item'},make=(x,y,kind='basic',hp=1)=>({x,y,w:30,h:32,kind,hp,alive:true,hurt:0,frozen:0,vy:0});
+ const e=make(101,268),side=make(133,268),air=make(101,250),below=make(101,310),plant=make(101,268,'plant');
+ const l={enemies:[e,side,air,below,plant]};assert.equal(impactBlock(b,l),1);assert(!e.alive);assert(side.alive&&air.alive&&below.alive&&plant.alive);assert.equal(plant.vy,0);assert.equal(impactBlock(b,l),0);
+ const armor=make(101,268,'hammer',2);l.enemies=[armor];b.impactLock=0;assert.equal(impactBlock(b,l),1);assert.equal(armor.hp,1);assert(armor.alive);assert(armor.vy<0);b.impactLock=0;armor.vy=0;assert.equal(impactBlock(b,l),0);armor.hurt=0;assert.equal(impactBlock(b,l),0);b.impactLock=0;assert.equal(impactBlock(b,l),1);assert(!armor.alive);
+ const frozen=make(101,268);frozen.frozen=3;l.enemies=[frozen];b.impactLock=0;impactBlock(b,l);assert(!frozen.alive);
+ const terrain={...b,kind:undefined,impactLock:0};const basic=make(101,268);assert.equal(impactBlock(terrain,{enemies:[basic]}),0);assert(basic.alive);
+ assert(!canBreakBlock(b,{enemies:[plant]}));
+});
+test('real head bumps affect patrols on item, spent and brick blocks; broken support makes survivors fall',()=>{
+ for(const [kind,used,state] of [['item',false,'SMALL'],['item',true,'SMALL'],['brick',false,'SMALL'],['brick',false,'SUPER']]){
+  run('start(0);level.platforms=[{x:0,y:470,w:1000,h:100}];level.blocks=[{x:300,y:380,w:32,h:32,kind:"'+kind+'",content:"coin",used:'+used+',broken:false,bump:0}];level.enemies=[{kind:"hammer",x:301,y:348,w:30,h:32,min:301,max:301,vx:0,vy:0,ground:true,alive:true,hp:2,hurt:0,frozen:0,age:0,attack:0,jumpTimer:0}];p.x=304;p.y=442;p.ground=true;transformPlayer(p,STATES.'+state+',solidsFor(level));pressed.add("Space");keys.add("Space");entryHeld=false');
+  for(let n=0;n<90;n++)run('update(1/120)');assert.equal(run('level.enemies[0].hp'),1);assert.equal(run('level.blocks[0].broken'),kind==='brick'&&state==='SUPER');
+  if(kind==='brick'&&state==='SUPER'){assert.equal(run('level.enemies[0].y+level.enemies[0].h'),470)}
+ }
+ for(const i of [7,11]){const l=makeLevel(i);assert(l.enemies.some(e=>l.blocks.some(b=>standsOnBlock(e,b))))}
+});
+
 console.log(count+' test groups passed.');

@@ -54,7 +54,7 @@ export function terrain(ctx,platforms,theme,camera){
  }
 }
 export function drawBlocks(ctx,blocks,time){
- for(const b of blocks){if(b.broken)continue;const y=b.y-(b.bump>0?Math.sin(b.bump/.16*Math.PI)*6:0),color=b.kind==='brick'?'#c18369':b.used?'#787b88':'#efc276';
+ for(const b of blocks){if(b.broken||b.hidden&&!b.revealed)continue;const y=b.y-(b.bump>0?Math.sin(b.bump/.16*Math.PI)*6:0),color=b.kind==='brick'?'#c18369':b.used?'#787b88':'#efc276';
   r(ctx,b.x,y,b.w,b.h,'#26364d');r(ctx,b.x+2,y+2,b.w-4,b.h-4,color);r(ctx,b.x+4,y+4,b.w-8,3,'#ffe3a2');
   if(b.kind==='brick'){r(ctx,b.x+2,y+14,b.w-4,2,'#754f59');r(ctx,b.x+12,y+2,2,12,'#754f59');r(ctx,b.x+20,y+16,2,12,'#754f59')}
   else if(!b.used){r(ctx,b.x+12,y+7,8,4,'#6e5555');r(ctx,b.x+16,y+11,4,5,'#6e5555');r(ctx,b.x+12,y+16,4,3,'#6e5555');r(ctx,b.x+12,y+22,4,3,'#6e5555')}

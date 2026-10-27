@@ -1,3 +1,4 @@
+import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed} from './objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy} from './encounters.mjs';
 import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from './map.mjs';
 import {STAGES,makeLevel,overlap,readProgress} from './levels.mjs';
@@ -87,9 +88,12 @@ function hit(){
  else if(result==='hurt'){tone(140,.15);$('status').textContent=p.state+' — temporary invincibility';}
 }
 function bumpBlock(block){
- if(block.content==='life'&&runState.lifeClaims?.includes(level.index)){block.used=true;return}
+ if(block.broken||!revealBlock(block,level,items))return;
+ impactBlock(block,level);
+
+ if(block.content==='life'&&runState.lifeClaims?.includes(level.index)){block.used=true;block.bump=.16;return}
  if(block.kind==='item'&&activateBlock(block,p,items))tone(630);
- if(block.kind==='brick'&&!block.broken&&p.state!==STATES.SMALL){
+ if(block.kind==='brick'&&!block.broken&&p.state!==STATES.SMALL&&canBreakBlock(block,level)){
  block.broken=true;burst(block.x+16,block.y+16,'#dcab7e');tone(220);
  }else block.bump=.16;
 }
@@ -116,7 +120,7 @@ function update(dt){
  if(result.jumped)tone(520);
  for(const trial of level.cloudTrials||[])if(p.x>=trial.edge-80&&p.x<trial.edge&&p.state!==STATES.CLOUD){p.x=trial.edge-81;p.vx=0;$('status').textContent='Cloud passage: collect the Cloud flower before crossing. C retries this trial.'}
  if(pressed.has('KeyX')||pressed.has('KeyK'))power();
- for(const block of level.blocks)block.bump=Math.max(0,(block.bump||0)-dt);
+ for(const block of level.blocks){block.bump=Math.max(0,(block.bump||0)-dt);block.impactLock=Math.max(0,(block.impactLock||0)-dt)}
  for(const b of clouds)b.life-=dt;
  clouds=clouds.filter(b=>b.life>0);
  stepItems(items,dt,level,p,item=>{if(item.type==='life'){if(claimLife(runState,level.index)){persistRun();extraLifeNotice()}return}if(item.type==='coin'){collectCoin();burst(item.x+14,item.y+14,'#f7cd69');tone(1100,.04);return}tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+'. Shift to run; X to use a special power.'});
@@ -139,7 +143,7 @@ function update(dt){
  if(s.life<=0)continue;
  if(s.type==='enemy'){if(overlap(p,s)){hit();s.life=0}}else{
  for(const e of level.enemies)if(e.alive&&overlap(s,e)){strikeEnemy(e,s.type);s.life=0;burst(e.x,e.y,colors[s.type])}
- if(boss&&boss.hp>0&&boss.cool<=0&&overlap(s,boss)){boss.hp--;boss.cool=.4;s.life=0;burst(boss.x,boss.y,colors[s.type]);tone(190)}
+ if(boss&&boss.hp>0&&overlap(s,boss)){s.life=0;if(bossProjectileAllowed(level.index,s.type)&&boss.cool<=0){boss.hp--;boss.cool=.4;burst(boss.x,boss.y,colors[s.type]);tone(190)}else if(!bossProjectileAllowed(level.index,s.type)){burst(s.x,s.y,'#b6e7ed');$('status').textContent='The Sentinel resists ice. Use Fire, Hammer or a stomp.'}}
  }}
  if(mode!=='play')return;
  shots=shots.filter(s=>s.life>0&&s.y<650&&s.x>-100&&s.x<level.width+100);

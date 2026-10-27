@@ -72,6 +72,11 @@ export function drawItem(ctx,item,time){
  const x=Math.round(item.x),y=Math.round(item.y+(item.type==='super'?0:Math.sin(time*3)*3)+(item.emerge>0?item.emerge/.35*28:0));
  const color=item.type==='life'?'#39cc62':item.type==='super'?'#a3e477':STATE_COLORS[item.type.toUpperCase()]||'#a8e978';
  const r=(a,b,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x+a,y+b,w,h)};
+ if(item.type==='hammer'){
+  // Hammer-shaped blossom: broad metal head, narrow handle, two leaves.
+  r(1,1,26,14,'#24334b');r(3,3,22,10,'#bba6d9');r(5,4,5,8,'#f2e9ff');r(20,3,5,10,'#82719f');
+  r(12,15,5,13,'#a27650');r(13,16,2,10,'#e4bd79');r(4,19,8,4,'#66b888');r(17,22,8,4,'#66b888');return;
+ }
  if(item.type==='coin'){r(8,2,12,24,'#d99435');r(4,6,20,16,'#f7cd69');r(12,6,4,16,'#fff0a4');return}
  if(item.type==='super'||item.type==='life'||item.type==='helicopter'){
   r(8,2,12,2,'#173950');r(4,4,20,4,color);r(2,8,24,8,color);r(0,14,28,4,'#173950');

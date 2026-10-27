@@ -41,13 +41,17 @@ export function enemyShot(shots,source,player,style='fire',speed=210){
 }
 export function stepEnemies(level,p,dt,shots){
  for(const e of level.enemies){if(!e.alive)continue;e.hurt=Math.max(0,(e.hurt||0)-dt);
-  if(e.frozen>0){e.frozen=Math.max(0,e.frozen-dt);continue}
-  e.age+=dt;e.warning=false;
-  if(e.kind==='plant'){const t=e.age%4.8;e.active=t>=2.6;e.warning=t>=2.1&&t<2.6;continue}
-  if(e.kind==='jumper'){
-   e.jumpTimer+=dt;if(e.jumpTimer>2.2&&e.ground){e.vy=-390;e.jumpTimer=0;e.ground=false}
-   e.vy=Math.min(650,e.vy+1100*dt);const direction=Math.sign(e.vx)||1;const collision=moveBody(e,dt,solidsFor(level));if(collision.hitX)e.vx=-direction*72;
-  }else e.x+=e.vx*dt;
+  const frozen=e.frozen>0;e.frozen=Math.max(0,e.frozen-dt);
+  if(!frozen){e.age+=dt;e.warning=false}
+  if(e.kind==='plant'){if(!frozen){const t=e.age%4.8;e.active=t>=2.6;e.warning=t>=2.1&&t<2.6}continue}
+  if(e.kind==='jumper'&&!frozen){e.jumpTimer+=dt;if(e.jumpTimer>2.2&&e.ground){e.vy=-390;e.jumpTimer=0;e.ground=false}}
+  const patrol=e.vx,direction=Math.sign(patrol)||1;
+  if(frozen)e.vx=0;
+  e.vy=Math.min(650,(e.vy||0)+1100*dt);
+  const collision=moveBody(e,dt,solidsFor(level));
+  if(frozen)e.vx=patrol;else if(collision.hitX)e.vx=-direction*Math.abs(patrol);
+  if(e.y>650){e.alive=false;continue}
+  if(frozen)continue;
   if(e.x<e.min||e.x>e.max){e.x=clamp(e.x,e.min,e.max);e.vx=-e.vx}
   if(!['fire','hammer','jumper'].includes(e.kind)||(e.x<p.x-300||e.x>p.x+520)||Math.abs(e.y-p.y)>180||Math.abs(e.x-p.x)<100)continue;
   const period=e.kind==='jumper'?2.5:level.index<5?3.6:3;

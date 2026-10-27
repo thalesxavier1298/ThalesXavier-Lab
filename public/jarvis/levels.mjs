@@ -1,3 +1,4 @@
+import {addHiddenBlocks,addBlockEncounters} from './objects.mjs';
 import {prepareEncounters} from './encounters.mjs';
 import {addCloudTrials} from './cloud-trials.mjs';
 import {DESIGNS,authorLevel} from './layouts.mjs';
@@ -8,7 +9,7 @@ export const STAGES=names.map((name,i)=>({name,index:i,boss:i===8||i===16,theme:
 export function makeLevel(index){
  if(!STAGES[index])throw new RangeError('Unknown stage');
  const s=STAGES[index];
- if(!s.boss){const regular=index>8?index-1:index;return prepareEncounters(addCloudTrials({...s,...authorLevel(expandDesign(DESIGNS[regular],regular))}))}
+ if(!s.boss){const regular=index>8?index-1:index;return addBlockEncounters(addHiddenBlocks(prepareEncounters(addCloudTrials({...s,...authorLevel(expandDesign(DESIGNS[regular],regular))}))))}
  const final=index===16,level=authorLevel(bossDesign(final));
  return prepareEncounters({...s,...level,theme:final?'castle':'tower',lava:final?level.platforms.filter(b=>b.h>=100).slice(0,-1).map((b,i,grounds)=>{const next=level.platforms.filter(t=>t.h>=100)[i+1];return {x:b.x+b.w,y:500,w:next.x-b.x-b.w,h:90}}).filter(b=>b.w>0):[],chief:{x:level.width-360,y:390,w:72,h:80,hp:final?10:6,max:final?10:6,cool:0,timer:0,dir:-1},goal:level.width-130});
 }

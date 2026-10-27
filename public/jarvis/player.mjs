@@ -49,7 +49,7 @@ export function stepPlayer(p,input,dt,level,clouds,onHead=()=>{}){
  if(!input.held&&p.vy<-C.jumpCut)p.vy=-C.jumpCut;
  p.vy=Math.min(C.maxFall,p.vy+C.gravity*dt);
  if(p.state===STATES.HELICOPTER&&input.held&&p.vy>100)p.vy=100;
- moveBody(p,dt,solids,clouds,onHead);
+ moveBody(p,dt,solids,clouds,onHead,(level.blocks||[]).filter(b=>b.hidden&&!b.revealed));
  p.x=Math.max(0,Math.min(level.width-p.w,p.x));
  if(p.ground){p.boost=true;if(!wasGround)p.landing=.09}
  // Prevent coyote time from being re-used after a jump.
