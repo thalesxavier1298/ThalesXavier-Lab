@@ -1,32 +1,24 @@
-# Jarvis: Skybound
+# Jarvis Adventure
 
-Original browser platform game at /jarvis/, linked from the English and Portuguese Projects page.
+Jogo de plataforma original integrado ao portfólio em /jarvis/.
+Confira CHECKPOINT1.md para mudanças, arquitetura, testes executados e limites de validação.
 
-## Play
-Move: arrows or A/D. Jump: Space, W or Up. Power: X or K. Pause: P or Escape. Restart stage: R.
-Touch buttons support simultaneous movement, jump and power.
-Clear 15 regular stages, the Sentinel Tower after stage 8, and the Storm King Castle.
-The world map unlocks stages in order and stores cleared-stage progress in localStorage.
-A reset button asks before clearing progress. If storage is blocked, the current session still works.
+## Executar
+npm ci
+npm run dev
 
-## Powers
-Cloud creates a temporary platform (three charges, reset on landing).
-Fire fires bouncing projectiles. Ice freezes regular enemies; touching frozen enemies shatters them.
-Hammer throws a projectile in an arc. Helicopter boosts once per landing and slows falling while Jump is held.
-Contact damage removes the current power. Bosses take damage from stomps and projectiles.
+Abra /projects e use Play Jarvis, ou visite /jarvis/ no endereço local.
+npm run build gera o site incluindo public/jarvis em dist/jarvis.
+node scripts/test-jarvis.mjs executa os testes de física e integração.
 
-## Development and verification
-Run npm ci, npm run dev, npm run build.
-Run node scripts/test-jarvis.mjs for deterministic game logic checks using a stubbed DOM/canvas.
-The game itself has no new package dependencies or backend.
-Vite copies public/jarvis into dist/jarvis during builds.
-Existing Wrangler static asset configuration serves the directory.
+## Controles
+Setas ou A/D: mover. Shift: correr. Space, W ou seta acima: pular.
+Segurar pulo aumenta a altura. S ou seta abaixo: agachar.
+X ou K: poder. P ou Escape: pausa. R: reiniciar a fase.
+Há controles de toque para mover, correr, agachar, pular e usar poder.
 
-## Current scope
-This is a first playable version with original geometric pixel-style characters and procedural variations of platform layouts across four palettes.
-Stage names are destination names; towers and castles use horizontal boss arenas.
-No Nintendo artwork, music, characters or level layouts are included.
-Audio consists of optional synthesized effects. The only external game-page resources are optional Google Fonts with local font fallbacks.
-Tested: production build; automated level counts, geometry, persistence fallback, movement, jump, all five powers, health, boss gates, victory, pause and death.
-Browser smoke test: map, stage entry, movement, cloud pickup, pause and rendering.
-A complete human playthrough of all 17 stages and real-device touch/difficulty testing remain outstanding.
+## Progressão
+15 fases, torre intermediária e castelo final.
+A chave de progresso anterior é preservada. Início e novas tentativas começam SMALL.
+Cogumelo cresce para SUPER. Blocos ? fornecem cogumelo quando pequeno e o poder configurado quando grande.
+Dano: poder → SUPER → SMALL → nova tentativa. Não há um sistema de vidas completo neste checkpoint.
