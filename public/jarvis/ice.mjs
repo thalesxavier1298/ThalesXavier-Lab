@@ -1,5 +1,5 @@
 import {intersects,solidsFor,moveBody,carryBox} from './physics.mjs';
-export const ICE={duration:6,warning:1.5,throwSpeed:420,launchVy:-180,gravity:1100,softLanding:360,flightLife:2.8};
+export const ICE={duration:6,warning:1.5,throwSpeed:420,launchVy:-180,gravity:1100};
 export function freezeEnemy(e,duration=ICE.duration){
  if(!e.alive||e.iceState==='carried'||e.iceState==='thrown')return false;
  if(e.iceState!=='frozen')e.patrolVx=e.vx;
@@ -11,13 +11,13 @@ export function stepFrozen(e,level,p,dt){
  if(e.iceState==='carried'||e.iceState==='thrown')return true;
  if(e.iceState!=='frozen')return false;
  const vx=e.vx;e.vx=0;e.vy=Math.min(650,(e.vy||0)+ICE.gravity*dt);
- if(e.kind!=='plant')moveBody(e,dt,solidsFor(level,e));e.vx=vx;
+ if(!['plant','fireplant'].includes(e.kind))moveBody(e,dt,solidsFor(level,e));e.vx=vx;
  if(e.y>650||(level.lava||[]).some(b=>intersects(e,b))){breakIce(e);return true}
  e.frozen=Math.max(0,e.frozen-dt);e.iceWarning=e.frozen<=ICE.warning;
  if(e.frozen>0)return true;
  const danger={x:e.x-14,y:e.y-10,w:e.w+28,h:e.h+20};
  if(intersects(danger,p)||solidsFor(level,e).some(b=>intersects(e,b))||level.enemies.some(other=>other!==e&&other.alive&&intersects(e,other))){e.frozen=.2;return true}
- e.iceState='normal';e.iceWarning=false;e.thawGrace=.8;e.attack=0;e.jumpTimer=0;e.warning=false;e.vx=e.patrolVx??e.vx;
+ e.iceState='normal';if(e.kind==='flyer'){e.baseY=e.y;e.age=0}e.iceWarning=false;e.thawGrace=.8;e.attack=0;e.jumpTimer=0;e.warning=false;e.vx=e.patrolVx??e.vx;
  const floor=solidsFor(level,e).find(b=>Math.abs(b.y-e.y-e.h)<3&&e.x>=b.x&&e.x+e.w<=b.x+b.w);
  if(floor){e.min=Math.max(floor.x+6,e.x-100);e.max=Math.min(floor.x+floor.w-e.w-6,e.x+100);if(e.min>e.max)e.min=e.max=e.x}else{e.min=e.x-80;e.max=e.x+80}
  return true;
@@ -25,7 +25,7 @@ export function stepFrozen(e,level,p,dt){
 function freeBox(box,level,p,except){return box.x>=0&&box.x+box.w<=level.width&&!intersects(box,p)&&!solidsFor(level,except).some(b=>intersects(box,b))&&!level.enemies.some(e=>e!==except&&e.alive&&e.iceState!=='carried'&&intersects(box,e))}
 export function pickIce(p,level){
  if(p.carry)return false;
- const candidates=level.enemies.filter(e=>e.alive&&e.iceState==='frozen'&&e.kind!=='plant'&&Math.abs((e.x+e.w/2)-(p.x+p.w/2))<=70&&Math.abs((e.y+e.h/2)-(p.y+p.h/2))<=55).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x));
+ const candidates=level.enemies.filter(e=>e.alive&&e.iceState==='frozen'&&!['plant','fireplant'].includes(e.kind)&&Math.abs((e.x+e.w/2)-(p.x+p.w/2))<=70&&Math.abs((e.y+e.h/2)-(p.y+p.h/2))<=55).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x));
  for(const e of candidates){
   const pose=carryBox({...p,carry:e}),steps=Math.max(1,Math.ceil(Math.hypot(pose.x-e.x,pose.y-e.y)/4));let clear=true;
   for(let n=1;n<=steps;n++){const box={...e,x:e.x+(pose.x-e.x)*n/steps,y:e.y+(pose.y-e.y)*n/steps};if(solidsFor(level,e).some(b=>intersects(box,b))){clear=false;break}}
@@ -38,7 +38,7 @@ export function releaseIce(p,level,{throwing=false,force=false,onBreak=()=>{}}={
  const face=p.face||1,candidates=[carryBox(p),{...carryBox(p),x:face>0?p.x+p.w+12:p.x-e.w-12}];
  const pos=candidates.find(box=>freeBox(box,level,p,e));
  if(!pos){if(force){p.carry=null;breakIce(e,onBreak)}return false}
- p.carry=null;Object.assign(e,pos);e.iceState=throwing?'thrown':'frozen';e.vx=throwing?face*ICE.throwSpeed:0;e.vy=throwing?ICE.launchVy:0;e.ground=false;e.throwLife=ICE.flightLife;return true;
+ p.carry=null;Object.assign(e,pos);e.iceState=throwing?'thrown':'frozen';e.vx=throwing?face*ICE.throwSpeed:0;e.vy=throwing?ICE.launchVy:0;e.ground=false;e.throwHits=new Set();return true;
 }
 export function clearCarry(p,onBreak=()=>{}){if(!p?.carry)return;const e=p.carry;p.carry=null;breakIce(e,onBreak)}
 export function smashIce(p,level,onBreak=()=>{}){
@@ -48,18 +48,22 @@ export function smashIce(p,level,onBreak=()=>{}){
 export function stepCarriedAndThrown(level,p,dt,onBreak=()=>{}){
  if(p.carry){if(!p.carry.alive||p.carry.iceState!=='carried')p.carry=null;else Object.assign(p.carry,carryBox(p))}
  for(const e of level.enemies){if(!e.alive||e.iceState!=='thrown')continue;
-  e.throwLife-=dt;if(e.throwLife<=0){breakIce(e,onBreak);continue}
   e.vy=Math.min(850,e.vy+ICE.gravity*dt);const steps=Math.max(1,Math.ceil(Math.max(Math.abs(e.vx*dt),Math.abs(e.vy*dt))/4));
   for(let n=0;n<steps&&e.alive&&e.iceState==='thrown';n++){
-   const bottom=e.y+e.h;e.x+=e.vx*dt/steps;e.y+=e.vy*dt/steps;
-   const wall=solidsFor(level,e).find(b=>intersects(e,b));
-   if(wall){
-    if(level.enemies.includes(wall))breakIce(wall,onBreak);
-    if(e.vy>0&&bottom<=wall.y+2&&e.vy<=ICE.softLanding&&!level.enemies.includes(wall)){e.y=wall.y-e.h;e.vx=0;e.vy=0;e.ground=true;e.iceState='frozen';e.frozen=Math.max(2,e.frozen);break}
-    breakIce(e,onBreak);break;
+   const bottom=e.y+e.h;e.x+=e.vx*dt/steps;
+   for(const wall of solidsFor(level,e)){if(!intersects(e,wall))continue;if(level.enemies.includes(wall))breakIce(wall,onBreak);else {breakIce(e,onBreak);break}}
+   if(!e.alive)break;
+   e.y+=e.vy*dt/steps;
+   for(const wall of solidsFor(level,e)){if(!intersects(e,wall))continue;
+    if(level.enemies.includes(wall)){breakIce(wall,onBreak);continue}
+    if(e.vy>=0&&bottom<=wall.y+2){e.y=wall.y-e.h;e.vy=0;e.ground=true}
+    else {breakIce(e,onBreak);break}
    }
-   const target=level.enemies.find(t=>t!==e&&t.alive&&t.iceState!=='carried'&&intersects(e,t));
-   if(target){if(target.iceState==='frozen')breakIce(target,onBreak);else if(!(target.hurt>0)){target.hp-=2;target.hurt=.45;if(target.hp<=0)target.alive=false}breakIce(e,onBreak);break}
+   if(!e.alive)break;
+   e.throwHits??=new Set();
+   for(const target of level.enemies){if(target===e||!target.alive||target.iceState==='carried'||e.throwHits.has(target)||!intersects(e,target))continue;
+    e.throwHits.add(target);if(target.iceState==='frozen')breakIce(target,onBreak);else if(!(target.hurt>0)){target.hp-=2;target.hurt=.45;if(target.hp<=0)target.alive=false;else {breakIce(e,onBreak);break}}
+   }
    if(level.chief?.hp>0&&intersects(e,level.chief)){breakIce(e,onBreak);break}
    if(e.y>650||e.x<0||e.x>level.width||(level.lava||[]).some(b=>intersects(e,b))){breakIce(e,onBreak);break}
   }
@@ -81,7 +85,7 @@ export function addIcePractice(level){
    level.signs.push({x:x-75,y:470,label:'ICE: E GRAB / JUMP + X THROW'},{x:x+120,y:320,label:'FROZEN RIVALS CAN BE STEPS'});return level;
   }
  }
- for(const e of level.enemies){if(e.kind==='plant')continue;
+ for(const e of level.enemies){if(['plant','fireplant'].includes(e.kind))continue;
   const floor=level.platforms.find(b=>b.y===470&&e.x>=b.x+100&&e.x+260<b.x+b.w);if(!floor||level.hazards.some(h=>Math.abs(h.x-e.x)<300))continue;
   const perch={x:e.x+80,y:320,w:110,h:20};
   if(level.platforms.some(b=>b!==floor&&intersects(perch,b))||level.blocks.some(b=>intersects(perch,b)||b.content==='life'&&Math.abs(b.x-perch.x)<100))continue;

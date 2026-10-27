@@ -45,11 +45,12 @@ test('throw hits the first target once; armor takes two damage; a wall protects 
   assert.equal(e.iceState,'broken');assert.equal(breaks,1);assert.equal(target.hp,wall?3:1);
  }
 });
-test('soft landings preserve ice; hard impacts break; airborne objects expire without thawing',()=>{
- const l=level(),p=player(600),e=enemy(200);l.enemies=[e];freezeEnemy(e);Object.assign(e,{iceState:'thrown',x:200,y:430,vx:0,vy:80,throwLife:2.8});for(let n=0;n<10;n++)stepCarriedAndThrown(l,p,.02);assert.equal(e.iceState,'frozen');assert(e.alive);
- Object.assign(e,{iceState:'thrown',x:200,y:430,vx:0,vy:500,throwLife:2.8});stepCarriedAndThrown(l,p,.02);assert.equal(e.iceState,'broken');
- const f=enemy(100);freezeEnemy(f);Object.assign(f,{iceState:'thrown',y:50,vx:0,vy:0,throwLife:.001,frozen:.001});l.enemies=[f];stepCarriedAndThrown(l,p,.01);assert.equal(f.iceState,'broken');
+test('landings keep thrown ice sliding without a lifetime or thaw; edges still remove it',()=>{
+ const l=level(),p=player(1600),e=enemy(200);l.width=20000;l.platforms[0].w=20000;l.enemies=[e];freezeEnemy(e);Object.assign(e,{iceState:'thrown',x:200,y:430,vx:420,vy:500});
+ for(let n=0;n<1200;n++)stepCarriedAndThrown(l,p,1/120);assert(e.alive);assert.equal(e.iceState,'thrown');assert.equal(e.vx,420);assert(e.x>4300);assert.equal(e.y+e.h,470);assert.equal(e.frozen,6);
+ l.width=e.x+10;stepCarriedAndThrown(l,p,.1);assert.equal(e.iceState,'broken');
 });
+
 test('standing on ice does not shatter it; Down + power explicitly breaks nearby ice',()=>{
  const l=level(),e=enemy(200),p=player(202);l.enemies=[e];freezeEnemy(e);p.y=350;p.ground=false;
  tick(l,p,90);assert(e.alive);assert.equal(p.y+p.h,e.y);assert(p.ground);assert(smashIce(p,l));assert(!e.alive);
@@ -60,7 +61,7 @@ test('thaw warns and waits near Jarvis or another body; safe thaw gives grace an
  e.attack=4;stepEnemies(l,p,.3,[]);assert.equal(e.iceState,'normal');assert(e.thawGrace>0);assert.equal(e.attack,0);assert.equal(e.frozen,0);
 });
 test('thrown ice cannot damage either boss or exploit the Sentinel immunity',()=>{
- for(const hp of [6,14]){const l=level(),p=player(600),e=enemy(200);l.enemies=[e];l.chief={x:240,y:380,w:72,h:80,hp};freezeEnemy(e);Object.assign(e,{iceState:'thrown',x:200,y:400,vx:420,vy:0,throwLife:2.8});for(let n=0;n<30;n++)stepCarriedAndThrown(l,p,1/120);assert.equal(l.chief.hp,hp);assert.equal(e.iceState,'broken')}
+ for(const hp of [6,14]){const l=level(),p=player(600),e=enemy(200);l.enemies=[e];l.chief={x:240,y:380,w:72,h:80,hp};freezeEnemy(e);Object.assign(e,{iceState:'thrown',x:200,y:400,vx:420,vy:0});for(let n=0;n<30;n++)stepCarriedAndThrown(l,p,1/120);assert.equal(l.chief.hp,hp);assert.equal(e.iceState,'broken')}
 });
 test('plants freeze and break but never move into a carried state; blocks still shatter frozen enemies',()=>{
  const l=level(),p=player(100),plant=enemy(145,'plant');l.enemies=[plant];freezeEnemy(plant);assert(!pickIce(p,l));assert(strikeEnemy(plant,'stomp'));assert.equal(plant.iceState,'broken');

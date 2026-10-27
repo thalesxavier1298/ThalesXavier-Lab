@@ -10,11 +10,11 @@ export function revealBlock(b,level,items=[],player=null){
 }
 export function impactBlock(b,level){
  if(!['item','brick'].includes(b.kind)||b.impactLock>0)return 0;b.impactLock=.16;let count=0;
- for(const e of level.enemies||[]){if(!standsOnBlock(e,b)||e.kind==='plant')continue;
+ for(const e of level.enemies||[]){if(!standsOnBlock(e,b)||['plant','fireplant'].includes(e.kind))continue;
   if(strikeEnemy(e,'block')){count++;if(e.alive){e.vy=-175;e.ground=false}}
  }return count;
 }
-export function canBreakBlock(b,level){return !(level.enemies||[]).some(e=>e.kind==='plant'&&standsOnBlock(e,b))}
+export function canBreakBlock(b,level){return !(level.enemies||[]).some(e=>['plant','fireplant'].includes(e.kind)&&standsOnBlock(e,b))}
 export function bossProjectileAllowed(index,type){return index!==8||type==='fire'||type==='hammer'}
 export function addHiddenBlocks(level){
  if(![0,2,5,10,13].includes(level.index))return level;
@@ -32,7 +32,7 @@ export function addHiddenBlocks(level){
 
 export function addBlockEncounters(level){
  if(![1,7,11].includes(level.index))return level;
- for(const e of level.enemies){if(e.kind==='plant')continue;
+ for(const e of level.enemies){if(['plant','fireplant'].includes(e.kind))continue;
   const floor=level.platforms.find(t=>t.y===470&&t.w>=400&&e.x>t.x+140&&e.x<t.x+t.w-140&&Math.abs(e.y+e.h-t.y)<2);if(!floor)continue;
   const x=e.x-33,y=floor.y-90,row={x,y,w:96,h:32};
   if(level.checkpoints.some(c=>Math.abs(c.x-x)<200)||level.blocks.some(b=>intersects({...row,x:x-30,w:156,h:90},b))||level.platforms.some(t=>t!==floor&&intersects({...row,y:y-40,h:130},t)))continue;

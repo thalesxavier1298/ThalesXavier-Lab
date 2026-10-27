@@ -464,4 +464,18 @@ test('all stage exit and retry paths discard carried references without saving o
  const data=readRun({getItem:k=>storage.get(k)});assert(!('carry' in data));
 });
 
+test('actual shell contacts stomp, kick away, hurt on return and stop on another stomp',()=>{
+ run('start(0);level.width=2000;level.platforms=[{x:0,y:470,w:2000,h:100}];level.blocks=[];level.moving=[];level.falling=[];level.hazards=[];level.enemies=[{kind:"shell",x:300,y:438,w:30,h:32,min:200,max:400,vx:0,vy:0,ground:true,alive:true,hp:1,hurt:0,frozen:0,age:0,attack:0,jumpTimer:0}];p.state=STATES.SMALL;p.h=28;p.power="none";p.x=302;p.y=410;p.vy=160;p.ground=false;p.inv=0;update(1/120)');
+ assert.equal(run('level.enemies[0].shellMode'),'idle');assert(run('p.vy')<0);
+ run('var shell=level.enemies[0];shell.hurt=0;shell.contactGrace=0;p.x=278;p.y=442;p.vy=0;p.ground=true;update(1/120)');assert.equal(run('shell.shellMode'),'slide');assert(run('shell.vx')>0);
+ run('shell.contactGrace=0;shell.x=350;shell.vx=-360;p.x=330;p.y=442;p.inv=0;update(1/120)');assert.equal(run('mode'),'dying');
+});
+test('actual boss pause freezes jump and retry clears engagement state',()=>{
+ run('start(16);p.x=7450;p.inv=999');for(let n=0;n<240;n++)run('update(1/120)');assert.equal(run('level.chief.state'),'jump');
+ const y=run('level.chief.y');run('pause();last=0;frame(100);frame(1000)');assert.equal(run('level.chief.y'),y);
+ run('pause();p.x=7200');for(let n=0;n<150;n++)run('update(1/120)');assert.equal(run('level.chief.y'),390);
+ run('start(16)');assert(!run('level.chief.engaged'));assert.equal(run('level.chief.state'),'rest');
+});
+
 console.log(count+' test groups passed.');
+

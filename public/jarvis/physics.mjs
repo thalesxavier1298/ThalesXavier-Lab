@@ -36,5 +36,5 @@ export function moveBody(body,dt,solids,oneWays=[],onHead=()=>{},hiddenBlocks=[]
 export function approach(value,target,amount){return value<target?Math.min(value+amount,target):Math.max(value-amount,target)}
 
 export function solidsFor(level,exclude=null){
- return [...(level.enemies||[]).filter(e=>e.alive&&e.iceState==='frozen'&&e.kind!=='plant'),...level.platforms,...(level.blocks||[]),...(level.moving||[]),...(level.falling||[]).filter(b=>b.state==='ready'||b.state==='shaking')].filter(b=>b!==exclude&&!b.broken&&(!b.hidden||b.revealed));
+ return [...(level.enemies||[]).filter(e=>e.alive&&e.iceState==='frozen'&&!['plant','fireplant'].includes(e.kind)),...level.platforms,...(level.blocks||[]),...(level.moving||[]),...(level.falling||[]).filter(b=>b.state==='ready'||b.state==='shaking')].filter(b=>b!==exclude&&!b.broken&&(!b.hidden||b.revealed));
 }
