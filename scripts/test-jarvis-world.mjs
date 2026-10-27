@@ -14,7 +14,7 @@ test('15 authored, distinct layouts with explicit identities and two preserved b
  assert.equal(DESIGNS.length,15);assert.equal(new Set(DESIGNS.map(d=>d.mechanic)).size,15);
  assert.equal(new Set(DESIGNS.map(d=>JSON.stringify(d.platforms))).size,15);
  for(let i=0;i<17;i++){const l=makeLevel(i);assert(l.identity&&l.mechanic);assert(l.checkpoints.length>=2);assert.equal(l.index,i)}
- for(const i of [8,16]){const l=makeLevel(i);assert.equal(l.chief.hp,i===8?6:10);assert.equal(l.width,i===8?5600:8100)}
+ for(const i of [8,16]){const l=makeLevel(i);assert.equal(l.chief.hp,i===8?6:14);assert.equal(l.width,i===8?5600:8100)}
 });
 test('every checkpoint is grounded, clear, away from hazards and enemies; no block overlaps terrain',()=>{
  for(let i=0;i<17;i++){

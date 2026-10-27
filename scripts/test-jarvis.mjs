@@ -1,7 +1,8 @@
+import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,enemyShot} from '../public/jarvis/encounters.mjs';
 import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from '../public/jarvis/map.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer} from '../public/jarvis/run.mjs';
+import {INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim} from '../public/jarvis/run.mjs';
 import vm from 'node:vm';
 import {PHYSICS as C,STATES,STATE_COLORS} from '../public/jarvis/config.mjs';
 import {intersects,canFit,resizeFeet,moveBody} from '../public/jarvis/physics.mjs';
@@ -108,10 +109,10 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
-prepare=()=>run('resetLives(runState)');
+prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
 test('actual game integration: blocks, five powers and form damage',()=>{
  run('start(0);p.inv=0');
  run('bumpBlock(level.blocks[0])');assert.equal(run('items.at(-1).type'),'super');
@@ -186,8 +187,8 @@ test('five deaths consume exactly five lives and produce Game Over without clear
  }
  assert.equal(run('unlocked'),progress);
  assert.equal(readRun({getItem:k=>storage.get(k)??null}).lives,0);
- node('continue').onclick();assert.equal(run('runState.lives'),5);assert.equal(run('checkpoint'),0);assert.equal(run('mode'),'play');
- assert.equal(run('remaining'),makeLevel(3).timeLimit);assert.equal(run('unlocked'),progress);
+ node('continue').onclick();assert.equal(run('runState.lives'),5);assert.equal(run('checkpoint'),0);assert.equal(run('mode'),'map');
+ run('start(3)');assert.equal(run('remaining'),makeLevel(3).timeLimit);assert.equal(run('unlocked'),progress);
 });
 test('time expires once regardless of power/invincibility; retry restores a generous full timer',()=>{
  run('start(4);checkpoint=1;transformPlayer(p,STATES.CLOUD,solidsFor(level));p.inv=999;remaining=.001;update(1/120)');
@@ -300,4 +301,88 @@ test('cloud supply works after Small death or another saved power; recovery rebu
  run('start(4);trial=level.cloudTrials[0];p.x=trial.edge-79;p.y=trial.top-48;transformPlayer(p,STATES.HELICOPTER,solidsFor(level));update(1/120)');assert(run('p.x')<run('trial.edge-80'));
 });
 
+
+test('coins cross stages and grant exactly one life at 50 while preserving remainder and saves',()=>{
+ run('start(0);for(let n=0;n<20;n++)collectCoin();win();showMap();start(1)');assert.equal(run('runState.coins'),20);
+ run('for(let n=0;n<20;n++)collectCoin();win();showMap();start(2)');assert.equal(run('runState.coins'),40);
+ run('for(let n=0;n<10;n++)collectCoin()');assert.equal(run('runState.coins'),0);assert.equal(run('runState.lives'),6);
+ run('runState.coins=49;for(let n=0;n<3;n++)collectCoin()');assert.equal(run('runState.coins'),2);assert.equal(run('runState.lives'),7);
+ const saved=readRun({getItem:k=>storage.get(k)});assert.equal(saved.lives,7);assert.equal(saved.coins,2);
+ const migrated=readRun({getItem:()=>JSON.stringify({lives:8,stage:3,state:'FIRE'})});assert.equal(migrated.lives,8);assert.equal(migrated.coins,0);assert.deepEqual(migrated.lifeClaims,[]);
+ run('p.y=700;update(1/120);deathScreen()');node('continue').onclick();assert.equal(run('runState.coins'),2);
+});
+test('Game Over returns to map with five lives, coins and unlocks; pause quit discards checkpoint',()=>{
+ run('unlocked=17;start(3);runState.coins=23;runState.lives=1;checkpoint=1;die();deathScreen()');assert.equal(run('mode'),'gameover');
+ node('continue').onclick();assert.equal(run('mode'),'map');assert.equal(run('runState.lives'),5);assert.equal(run('runState.coins'),23);assert.equal(run('unlocked'),17);assert.equal(run('checkpoint'),0);
+ run('runState.state=STATES.FIRE;start(3);checkpoint=1;transformPlayer(p,STATES.ICE,solidsFor(level));keys.add("ArrowRight");pause()');assert.equal(node('quit-level').hidden,false);
+ node('quit-level').onclick();assert.equal(run('mode'),'map');assert.equal(run('keys.size'),0);assert.equal(run('runState.lives'),5);assert.equal(run('runState.coins'),23);assert.equal(run('checkpoint'),0);
+ run('start(3)');assert.equal(run('p.x'),80);assert.equal(run('p.state'),'FIRE');assert.equal(run('remaining'),makeLevel(3).timeLimit);assert.equal(node('overlay').hidden,true);
+});
+test('one optional green mushroom per stage gives life without changing form and cannot be farmed',()=>{
+ for(let i=0;i<17;i++)assert.equal(makeLevel(i).blocks.filter(b=>b.content==='life').length,1);
+ for(const state of Object.values(STATES)){
+  run('runState.lifeClaims=[];resetLives(runState);start(0);transformPlayer(p,STATES.'+state+',solidsFor(level));items.push(createItem("life",p.x+14,p.y+28));update(1/120)');
+  assert.equal(run('runState.lives'),6);assert.equal(run('p.state'),state);
+ }
+ run('start(0)');assert.equal(run('level.blocks.find(b=>b.content==="life").used'),true);
+ run('var totalItems=items.length;bumpBlock(level.blocks.find(b=>b.content==="life"))');assert.equal(run('items.length'),run('totalItems'));
+ run('pause();quitLevel();start(0)');assert.equal(run('level.blocks.find(b=>b.content==="life").used'),true);
+ assert(readRun({getItem:k=>storage.get(k)}).lifeClaims.includes(0));
+ run('p.y=700;update(1/120);deathScreen()');node('continue').onclick();assert.equal(run('level.blocks.find(b=>b.content==="life").used'),true);
+ run('win();start(0)');assert.equal(run('level.blocks.find(b=>b.content==="life").used'),false);
+ run('start(4);var trial=level.cloudTrials[0];p.x=trial.start+80;runState.lifeClaims=[4];retryCloudTrial()');assert.equal(run('level.blocks.find(b=>b.content==="life").used'),true);
+});
+test('green mushroom emerges, obeys gravity and patrols like a growth mushroom',()=>{
+ const l=makeLevel(0),p=grounded(),b=l.blocks.find(b=>b.content==='life'),items=[];activateBlock(b,p,items);assert.equal(items[0].type,'life');assert(items[0].emerge>0);
+ const item=items[0],x=item.x;for(let n=0;n<100;n++)stepItems(items,1/120,l,p);assert(item.x>x);assert(item.vy>=0);
+});
+test('new rivals introduce distinct telegraphs, projectile arcs, jumping and armored health',()=>{
+ assert(makeLevel(0).enemies.every(e=>e.kind==='basic'));const all=new Set(Array.from({length:17},(_,i)=>makeLevel(i).enemies).flat().map(e=>e.kind));for(const kind of ['basic','fire','hammer','jumper','plant'])assert(all.has(kind));
+ for(const [kind,index] of [['fire',1],['hammer',7],['jumper',14]]){
+  const l=makeLevel(index),e=l.enemies.find(e=>e.kind===kind);l.enemies=[e];const p=grounded();p.x=e.x+230;p.y=e.y;let sawWarning=false,sawJump=false,shots=[];
+  for(let n=0;n<600;n++){stepEnemies(l,p,1/120,shots);sawWarning||=e.warning;sawJump||=e.y<e.baseY-20}
+  assert(sawWarning,kind+' warning');assert(shots.length>0);assert(shots.every(s=>s.owner==='enemy'&&s.life<=3.5));
+  if(kind==='hammer')assert(shots.some(s=>s.gravity===900&&s.vy<0));if(kind==='jumper')assert(sawJump);
+  e.hp=2;e.hurt=0;e.frozen=0;e.alive=true;assert(strikeEnemy(e,'fire'));assert.equal(e.hp,1);assert(e.alive);assert(!strikeEnemy(e,'fire'));e.hurt=0;assert(strikeEnemy(e,'hammer'));assert(!e.alive);
+ }
+ const l=makeLevel(4),plant=l.enemies.find(e=>e.kind==='plant');l.enemies=[plant];const p=grounded();p.x=plant.x+180;assert(!plant.active);for(let n=0;n<330;n++)stepEnemies(l,p,1/120,[]);assert(plant.active);assert(!strikeEnemy(plant,'stomp'));assert(strikeEnemy(plant,'ice'));assert.equal(plant.frozen,4);assert(strikeEnemy(plant,'stomp'));assert(!plant.alive);
+ const shots=[];for(let n=0;n<100;n++)enemyShot(shots,{x:0,y:0,w:30},{x:200},'fire');assert.equal(shots.length,24);
+});
+test('enemy projectiles hit once, expire and stop at terrain; frozen rivals stop moving',()=>{
+ run('start(0);p.inv=0;transformPlayer(p,STATES.FIRE,solidsFor(level));shots.push({x:p.x,y:p.y,w:14,h:14,vx:0,vy:0,gravity:0,type:"enemy",owner:"enemy",style:"fire",life:1});update(1/120)');assert.equal(run('p.state'),'SUPER');assert.equal(run('shots.length'),0);
+ run('shots.push({x:200,y:480,w:14,h:14,vx:0,vy:0,gravity:0,type:"enemy",owner:"enemy",style:"fire",life:1});update(1/120)');assert.equal(run('shots.length'),0);
+ run('shots.push({x:200,y:100,w:14,h:14,vx:0,vy:0,gravity:0,type:"enemy",owner:"enemy",style:"fire",life:.001});update(1/120)');assert.equal(run('shots.length'),0);
+ const l=makeLevel(14),e=l.enemies[0],x=e.x;e.frozen=1;stepEnemies(l,grounded(),.5,[]);assert.equal(e.x,x);assert.equal(e.frozen,.5);
+});
+test('Storm King visits three safe docks, warns, recovers and intensifies; arena can be crossed',()=>{
+ const l=makeLevel(16),b=l.chief,p=grounded();p.x=7450;const docks=new Set(),states=new Set(),shots=[];
+ for(let n=0;n<4000;n++){stepFinalBoss(b,p,1/120,shots);states.add(b.state);assert(b.x>=7460&&b.x<=7940);assert(b.y>=220&&b.y<=390);assert(!l.platforms.some(t=>intersects(b,t)),'boss clipped a platform');if(b.state==='recover'){docks.add(b.dock);assert(l.platforms.some(t=>b.x>=t.x&&b.x+b.w<=t.x+t.w&&Math.abs(b.y+b.h-t.y)<1))}}
+ assert.equal(docks.size,3);for(const s of ['warn','jump','recover','rest'])assert(states.has(s));assert(shots.length<=24);
+ b.hp=8;stepFinalBoss(b,p,.01,[]);assert.equal(b.phase,2);b.hp=4;stepFinalBoss(b,p,.01,[]);assert.equal(b.phase,3);
+ assert(l.lava.some(t=>t.x===7600));assert.equal(makeLevel(8).chief.hp,6);assert.equal(makeLevel(16).chief.hp,14);
+});
+
+test('final boss takes real stomps and projectiles; defeat opens the existing finish gate',()=>{
+ run('start(16);p.x=level.chief.x+25;p.y=level.chief.y-49;p.h=48;p.state=STATES.SUPER;p.power="none";p.vy=160;p.ground=false;p.inv=0;entryHeld=false;update(1/120)');assert.equal(run('level.chief.hp'),13);assert(run('p.vy')<0);
+ run('p.x=7400;p.y=422;p.inv=0;level.chief.cool=0;shots.push({x:level.chief.x+20,y:level.chief.y+30,w:16,h:16,vx:0,vy:0,type:"fire",life:1});update(1/120)');assert.equal(run('level.chief.hp'),12);
+ run('level.chief.hp=1;level.chief.cool=0;shots.push({x:level.chief.x+20,y:level.chief.y+30,w:16,h:16,vx:0,vy:0,type:"fire",life:1});update(1/120)');assert.equal(run('level.chief.hp'),0);
+ run('p.x=level.goal;p.y=422;p.vy=0;update(1/120)');assert.equal(run('mode'),'won');assert.equal(run('unlocked'),17);
+});
+test('Small Jarvis can cross the new arena platforms and gaps with normal running jumps',()=>{
+ const l=makeLevel(16),p=createPlayer(7380,442);p.ground=true;let reached=false;
+ for(let n=0;n<1400;n++){
+  const floor=l.platforms.find(t=>Math.abs(t.y-(p.y+p.h))<2&&p.x+p.w>t.x&&p.x<t.x+t.w);
+  const jump=p.ground&&floor&&p.x>floor.x+floor.w-65;
+  stepPlayer(p,{axis:1,run:true,jump,held:true,down:false},1/120,l,[]);
+  if(p.x>=l.goal&&p.ground){reached=true;break}if(p.y>620)break;
+ }
+ assert(reached,'arena path should not require any power');
+});
+test('every life block has a clear underside and can be hit by Small Jarvis with the real jump',()=>{
+ for(let i=0;i<17;i++){
+  const l=makeLevel(i),b=l.blocks.find(b=>b.content==='life'),p=createPlayer(b.x+4,b.y+144-28);p.ground=true;const items=[];
+  for(let n=0;n<160;n++)stepPlayer(p,{axis:0,run:false,jump:n===0,held:true,down:false},1/120,l,[],block=>activateBlock(block,p,items));
+  assert(b.used,'unreachable life block '+i);assert.equal(items[0].type,'life');
+ }
+});
 console.log(count+' test groups passed.');
