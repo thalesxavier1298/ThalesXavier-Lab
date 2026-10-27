@@ -11,5 +11,3 @@ button{box-shadow:inset -2px -2px #0003}
 .touch{gap:8px}
 .touch button{min-width:48px;padding:8px 10px}
 @media(max-width:700px){.touch{gap:4px;padding:8px 6px}.touch button{font-size:10px;min-width:35px;padding:7px 6px;min-height:44px}.toolbar{flex-wrap:wrap}}
-
-.mechanic-guide{display:grid;grid-template-columns:repeat(4,1fr);gap:20px;padding:0 12px 40px}.mechanic-guide article{border-top:2px solid #8bd7c0;padding-top:16px}.mechanic-guide b{font-size:11px;color:#f7cd69}.mechanic-guide p{font-size:12px;color:#a6c0cc;line-height:1.7}@media(max-width:700px){.mechanic-guide{grid-template-columns:1fr 1fr}}

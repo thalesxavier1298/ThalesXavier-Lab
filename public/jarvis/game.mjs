@@ -3,11 +3,10 @@ import {PHYSICS,STATES} from './config.mjs';
 import {createPlayer,stepPlayer,damagePlayer,transformPlayer} from './player.mjs';
 import {createItem,activateBlock,stepItems} from './items.mjs';
 import {drawSprite,drawItem} from './sprites.mjs';
-import {background,terrain,drawBlocks,drawMechanics} from './rendering.mjs';
-import {stepWorld,checkpointReached,resetWorld,refillBlocks,solidsFor} from './world.mjs';
+import {background,terrain,drawBlocks} from './rendering.mjs';
 const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('2d');
 let unlocked;try{unlocked=readProgress(localStorage)}catch{unlocked=0}
-let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],particles=[],camera=0,mode='map',last=0,clock=0,score=0,checkpoint=0,sound=false,audio=null,items=[],deathTimer=0,accumulator=0;
+let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],particles=[],camera=0,mode='map',last=0,clock=0,score=0,checkpoint=80,sound=false,audio=null,items=[],deathTimer=0,accumulator=0;
 ctx.imageSmoothingEnabled=false;
 const colors={super:'#a3e477',cloud:'#eef8ff',fire:'#ff9a58',ice:'#8ce5ff',hammer:'#d8b6ff',helicopter:'#f5d977',none:'#8bd7c0'};
 function tone(freq=440,duration=.08){if(!sound)return;try{audio??=new AudioContext();const o=audio.createOscillator(),g=audio.createGain();o.connect(g);g.connect(audio.destination);o.frequency.value=freq;g.gain.setValueAtTime(.035,audio.currentTime);g.gain.exponentialRampToValueAtTime(.001,audio.currentTime+duration);o.start();o.stop(audio.currentTime+duration)}catch{}}
@@ -20,17 +19,17 @@ function renderMap(){
  const route=coords.map(v=>v.x+','+v.y).join(' ');
  $('island-map').innerHTML='<svg viewBox="0 0 960 445" role="group" aria-label="World map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".25"/></filter></defs><path d="M30 60 Q200 -5 370 65 T730 55 Q960 10 930 240 Q970 430 730 410 Q510 475 330 405 Q20 460 20 250Z" fill="#477265" opacity=".5"/><path d="M40 65 Q270 15 445 72 T910 76" fill="none" stroke="#8cb58b" stroke-width="2" opacity=".25"/><polyline points="'+route+'" fill="none" stroke="#102e3b" stroke-width="14" stroke-linejoin="round"/><polyline points="'+route+'" fill="none" stroke="#6b938b" stroke-width="3" stroke-dasharray="5 9"/>'+STAGES.map((s,i)=>{
  const {x,y}=coords[i],locked=i>unlocked,done=i<unlocked,label=s.boss?(i===8?'TOWER':'CASTLE'):String(i>8?i:i+1).padStart(2,'0');
- return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(i===unlocked?'<text x="'+x+'" y="'+(y-39)+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
+ return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(i===unlocked?'<text x="'+x+'" y="'+(y-39)+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'</svg>';
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(i<=unlocked)start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}});
 }
 function showMap(){mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
 $('reset').onclick=()=>{if(confirm('Reset all Jarvis stage progress on this device?')){unlocked=0;try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){level=makeLevel(i);checkpoint=0;score=0;accumulator=0;respawn();$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+function start(i){level=makeLevel(i);checkpoint=80;score=0;accumulator=0;respawn();$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent='SMALL: find the green mushroom. Hit ? blocks from below. Shift = run; Down = crouch.'}
 function respawn(){
- const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;p.inv=PHYSICS.invincibility;
- shots=[];clouds=[];particles=[];items=fresh.items;
+ p=createPlayer(checkpoint,360);p.inv=PHYSICS.invincibility;
+ shots=[];clouds=[];particles=[];items=[createItem('super',checkpoint+72,440,{emerge:true})];
  keys.clear();pressed.clear();camera=Math.max(0,Math.min(level.width-960,p.x-300));
 }
 function modal(title,copy,label,next){$('overlay-title').textContent=title;$('overlay-copy').textContent=copy;$('continue').textContent=label;$('overlay').hidden=false;$('continue').onclick=next;keys.clear();pressed.clear()}
@@ -48,7 +47,7 @@ function deathScreen(){
 }
 function win(){mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
 function hit(){
- const result=damagePlayer(p,solidsFor(level));
+ const result=damagePlayer(p,[...level.platforms,...level.blocks].filter(b=>!b.broken));
  if(result==='dead')die();
  else if(result==='hurt'){tone(140,.15);$('status').textContent=p.state+' — temporary invincibility';}
 }
@@ -66,7 +65,6 @@ function power(){if(p.cool>0||p.power==='none'||p.crouch||p.dead)return;p.cool=.
 }
 function update(dt){
  clock+=dt;
- stepWorld(level,p,dt);
  const oldY=p.y;
  const input={
  jump:pressed.has('Space')||pressed.has('KeyW')||pressed.has('ArrowUp'),
@@ -81,11 +79,9 @@ function update(dt){
  for(const block of level.blocks)block.bump=Math.max(0,(block.bump||0)-dt);
  for(const b of clouds)b.life-=dt;
  clouds=clouds.filter(b=>b.life>0);
- refillBlocks(level,p,items,dt);
  stepItems(items,dt,level,p,item=>{tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+'. Shift to run; X to use a special power.'});
- const reached=checkpointReached(level,p,checkpoint);
- if(reached!==checkpoint){checkpoint=reached;$('status').textContent='Checkpoint reached — safe return and fresh supplies.';tone(900)}
- for(const h of level.hazards)if(h.state==='active'&&overlap(p,h)){hit();if(mode!=='play')return}
+ if(p.x>level.width*.5&&checkpoint===80&&p.ground){checkpoint=level.width*.5; // Find safe ground at the midpoint.
+ const floor=level.platforms.find(b=>b.y===470&&b.x>=checkpoint);checkpoint=floor?floor.x+35:80;$('status').textContent='Checkpoint reached!';tone(900)}
  if(p.y>620){die();return}
  for(const c of level.coins)if(!c.taken&&overlap(p,{x:c.x-9,y:c.y-9,w:18,h:18})){c.taken=true;score++;tone(1100,.04);burst(c.x,c.y,'#f7cd69')}
  for(const e of level.enemies){if(!e.alive)continue;if(e.frozen>0)e.frozen-=dt;else{e.x+=e.vx*dt;if(e.x<e.min||e.x>e.max)e.vx*=-1}
@@ -96,7 +92,7 @@ function update(dt){
  if(overlap(p,boss)){if(p.vy>0&&oldY+p.h<=boss.y+20){if(boss.cool<=0){boss.hp--;boss.cool=.65;burst(boss.x,boss.y,'#f7cd69')}p.vy=-570}else hit();if(mode!=='play')return;}
  }
  for(const s of shots){s.life-=dt;const before=s.y;s.x+=s.vx*dt;s.vy+=(s.type==='hammer'?1100:600)*dt;s.y+=s.vy*dt;
- if(s.type!=='hammer')for(const b of solidsFor(level))if(overlap(s,b)){if(s.vy>0&&before+s.h<=b.y+12){s.y=b.y-s.h;s.vy=-260}else s.life=0}
+ if(s.type!=='hammer')for(const b of [...level.platforms,...level.blocks].filter(b=>!b.broken))if(overlap(s,b)){if(s.vy>0&&before+s.h<=b.y+12){s.y=b.y-s.h;s.vy=-260}else s.life=0}
  if(s.type==='enemy'){if(overlap(p,s)){hit();s.life=0}}else{
  for(const e of level.enemies)if(e.alive&&overlap(s,e)){if(s.type==='ice')e.frozen=4;else e.alive=false;s.life=0;burst(e.x,e.y,colors[s.type])}
  if(boss&&boss.hp>0&&boss.cool<=0&&overlap(s,boss)){boss.hp--;boss.cool=.4;s.life=0;burst(boss.x,boss.y,colors[s.type]);tone(190)}
@@ -121,13 +117,15 @@ function draw(){
  drawBlocks(ctx,level.blocks,clock);
  for(const item of items)drawItem(ctx,item,clock);
  for(const b of clouds){ctx.globalAlpha=Math.min(1,b.life);circle(b.x+20,b.y+8,14,'white');circle(b.x+45,b.y,20,'white');circle(b.x+70,b.y+7,14,'white');rect(b.x,b.y,100,14,'white');ctx.globalAlpha=1}
- drawMechanics(ctx,level,p,checkpoint,clock);
+ // Checkpoint flag.
+ const mid=level.platforms.find(b=>b.y===470&&b.x>=level.width*.5);
+ if(mid){rect(mid.x+35,395,3,75,'#f0e8d9');rect(mid.x+38,395,30,20,checkpoint>80?'#8bd7c0':'#b6c3cc')}
  for(const c of level.coins)if(!c.taken){circle(c.x,c.y,9,'#f7cf62');circle(c.x,c.y,5,'#ffe9a2')}
  for(const e of level.enemies)if(e.alive){const x=e.x,y=e.y;rect(x+3,y+7,24,25,e.frozen>0?'#96e7ff':'#725779');rect(x,y+25,10,7,'#32344e');rect(x+20,y+25,10,7,'#32344e');rect(x+5,y+10,5,5,'#fff');rect(x+20,y+10,5,5,'#fff');if(e.frozen>0){ctx.strokeStyle='#e0ffff';ctx.strokeRect(x-3,y-3,36,38)}}
  const boss=level.chief;
  if(boss&&boss.hp>0){rect(boss.x,boss.y,boss.w,boss.h,boss.cool>0?'#f6cb72':'#40375c');rect(boss.x-10,boss.y+12,92,20,'#77618c');for(let i=0;i<3;i++)rect(boss.x+10+i*22,boss.y-12,12,18,'#f7cd69');rect(boss.x+12,boss.y+30,12,8,'#fcba72');rect(boss.x+48,boss.y+30,12,8,'#fcba72');rect(boss.x,boss.y-30,72,5,'#221b36');rect(boss.x,boss.y-30,72*boss.hp/boss.max,5,'#f7cd69');text(level.index===16?'STORM KING':'THE SENTINEL',boss.x+36,boss.y-44,12,'#fff','center')}
  for(const s of shots){ctx.save();ctx.translate(s.x+8,s.y+8);if(s.type==='hammer'){ctx.rotate(clock*14);rect(-3,-8,6,24,'#dbad74');rect(-12,-10,24,12,colors.hammer)}else circle(0,0,8,s.type==='enemy'?'#ef8580':colors[s.type]);ctx.restore()}
- const goal=level.goal;rect(goal,level.goalY-170,6,170,'#ece6bd');rect(goal+6,level.goalY-170,48,30,boss&&boss.hp>0?'#a47e8b':'#f7cd69');circle(goal+3,level.goalY-175,9,'#fff2ae');text(boss&&boss.hp>0?'DEFEAT THE GUARDIAN':'FINISH',goal,level.goalY-188,12,'#fff','center');
+ const goal=level.goal;rect(goal,300,6,170,'#ece6bd');rect(goal+6,300,48,30,boss&&boss.hp>0?'#a47e8b':'#f7cd69');circle(goal+3,295,9,'#fff2ae');text(boss&&boss.hp>0?'DEFEAT THE GUARDIAN':'FINISH',goal,282,12,'#fff','center');
  drawSprite(ctx,p,clock);
  for(const a of particles){ctx.globalAlpha=Math.max(0,a.life/.6);rect(a.x,a.y,4,4,a.color);ctx.globalAlpha=1}
  ctx.restore();

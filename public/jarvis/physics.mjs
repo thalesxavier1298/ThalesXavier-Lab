@@ -28,7 +28,3 @@ export function moveBody(body,dt,solids,oneWays=[],onHead=()=>{}){
  return {hitX,hitY,landed};
 }
 export function approach(value,target,amount){return value<target?Math.min(value+amount,target):Math.max(value-amount,target)}
-
-export function solidsFor(level){
- return [...level.platforms,...(level.blocks||[]),...(level.moving||[]),...(level.falling||[]).filter(b=>b.state==='ready'||b.state==='shaking')].filter(b=>!b.broken);
-}
