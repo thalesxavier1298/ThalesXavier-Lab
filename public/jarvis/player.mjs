@@ -1,10 +1,10 @@
 import {PHYSICS as C,STATES} from './config.mjs';
-import {resizeFeet,moveBody,approach,solidsFor} from './physics.mjs';
+import {resizeFeet,moveBody,approach,solidsFor,carryBox,canFit} from './physics.mjs';
 export const special=s=>s!==STATES.SMALL&&s!==STATES.SUPER;
 export function createPlayer(x=80,y=360){
  return {x,y,w:C.width,h:C.smallHeight,vx:0,vy:0,state:STATES.SMALL,power:'none',
  face:1,ground:false,coyote:0,buffer:0,cool:0,charges:3,boost:true,inv:0,
- crouch:false,transform:0,damage:0,landing:0,anim:'idle',animTime:0,pending:null,dead:false};
+ crouch:false,transform:0,damage:0,landing:0,anim:'idle',animTime:0,pending:null,dead:false,carry:null};
 }
 function applyState(p,state){p.state=state;p.power=special(state)?state.toLowerCase():'none';p.charges=3;p.boost=true}
 export function transformPlayer(p,state,solids,{animate=true}={}){
@@ -45,12 +45,12 @@ export function stepPlayer(p,input,dt,level,clouds,onHead=()=>{}){
  const axis=input.axis,top=p.crouch?C.crawlSpeed:input.run?C.runSpeed:C.walkSpeed;
  const accel=axis?(wasGround?C.acceleration:C.airAcceleration):(level.theme==='frost'&&wasGround?C.iceFriction:C.friction);
  p.vx=approach(p.vx,axis*top,accel*dt);
- if(axis)p.face=axis;
+ if(axis){const held=p.carry?carryBox(p,axis):null;if(!held||held.x>=0&&held.x+held.w<=level.width&&canFit(held,solids))p.face=axis;}
  if(!input.held&&p.vy<-C.jumpCut)p.vy=-C.jumpCut;
  p.vy=Math.min(C.maxFall,p.vy+C.gravity*dt);
  if(p.state===STATES.HELICOPTER&&input.held&&p.vy>100)p.vy=100;
  moveBody(p,dt,solids,clouds,onHead,(level.blocks||[]).filter(b=>b.hidden&&!b.revealed));
- p.x=Math.max(0,Math.min(level.width-p.w,p.x));
+ const left=p.carry&&p.face<0?p.carry.w+6:0,right=level.width-p.w-(p.carry&&p.face>0?p.carry.w+6:0);p.x=Math.max(left,Math.min(right,p.x));
  if(p.ground){p.boost=true;if(!wasGround)p.landing=.09}
  // Prevent coyote time from being re-used after a jump.
  if(jumped)p.coyote=0;

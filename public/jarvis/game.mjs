@@ -1,3 +1,4 @@
+import {pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from './ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed} from './objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy} from './encounters.mjs';
 import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from './map.mjs';
@@ -41,7 +42,7 @@ function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel){entryHeld=holdSp
 for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map-up','ArrowUp'],['map-down','ArrowDown']])$(id).onclick=()=>walkMap(key);
 $('map-enter').onclick=()=>enterMap();
 function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;$('map-selected').textContent=STAGES[mapIndex].name+' — Space to enter'}}
-function showMap(){$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
+function showMap(){clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
 function retryCloudTrial(){
  if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
@@ -52,8 +53,8 @@ function retryCloudTrial(){
 $('cloud-retry').onclick=retryCloudTrial;
 
 $('reset').onclick=()=>{if(confirm('Reset all Jarvis stage progress on this device?')){unlocked=0;runState.coins=0;runState.lifeClaims=[];mapIndex=0;mapTravel=null;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
-function respawn(state=STATES.SMALL){
+function start(i){clearCarry(p);level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+function respawn(state=STATES.SMALL){clearCarry(p);
  const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;transformPlayer(p,state,solidsFor(level),{animate:false});p.inv=PHYSICS.invincibility;
  shots=[];clouds=[];particles=[];items=fresh.items;remaining=level.timeLimit;
  keys.clear();pressed.clear();camera=Math.max(0,Math.min(level.width-960,p.x-300));
@@ -62,11 +63,11 @@ function modal(title,copy,label,next){$('quit-level').hidden=true;$('overlay-tit
 function pause(){if(mode==='play'){mode='paused';$('pause').textContent='Resume';modal('Take a breather.','Your adventure will be right here.','Resume',pause);$('quit-level').hidden=false}else if(mode==='paused'){mode='play';$('quit-level').hidden=true;$('pause').textContent='Pause';$('overlay').hidden=true;canvas.focus()}}
 $('pause').onclick=pause;
 function die(reason='hit'){
- if(mode!=='play')return;
+ if(mode!=='play')return;clearCarry(p);
  deathReason=reason;runState.state=STATES.SMALL;loseLife(runState);persistRun();mode='dying';deathTimer=.75;p.dead=true;p.anim='death';p.animTime=0;p.vy=-330;tone(100,.3);
  keys.clear();pressed.clear();
 }
-function gameOver(){
+function gameOver(){clearCarry(p);
  mode='gameover';$('map').hidden=true;$('play').hidden=false;$('pause').hidden=true;
  remaining=0;if(!p||!level)p=createPlayer(80,442);
  modal('GAME OVER','Your cleared stages and coins are safe. Return to the map with '+INITIAL_LIVES+' lives.','Return to world map',()=>{
@@ -81,14 +82,15 @@ function deathScreen(){
  const i=level.index,cp=checkpoint;start(i);checkpoint=cp;respawn();mode='play';$('overlay').hidden=true;
  });
 }
-function win(){clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
+function win(){clearCarry(p);clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
 function hit(){
  const result=damagePlayer(p,solidsFor(level));
+ if(result!=='ignored'&&p.carry)releaseIce(p,level,{force:true,onBreak:iceBurst});
  if(result==='dead')die();
  else if(result==='hurt'){tone(140,.15);$('status').textContent=p.state+' — temporary invincibility';}
 }
 function bumpBlock(block){
- if(block.broken||!revealBlock(block,level,items))return;
+ if(block.broken||!revealBlock(block,level,items,p))return;
  impactBlock(block,level);
 
  if(block.content==='life'&&runState.lifeClaims?.includes(level.index)){block.used=true;block.bump=.16;return}
@@ -98,7 +100,13 @@ function bumpBlock(block){
  }else block.bump=.16;
 }
 function burst(x,y,color){for(let i=0;i<10;i++)particles.push({x,y,vx:(Math.random()-.5)*220,vy:-Math.random()*190,life:.6,color})}
-function power(){if(p.cool>0||p.power==='none'||p.crouch||p.dead)return;p.cool=.32;
+function iceBurst(e){burst(e.x+e.w/2,e.y+e.h/2,'#b6edff');tone(940,.1)}
+function interactIce(){const ok=p.carry?releaseIce(p,level):pickIce(p,level);$('status').textContent=ok?(p.carry?'Ice carried. E/J drops; X/K throws.':'Ice placed safely.'):'No accessible frozen rival or no room to place it.';if(ok)tone(720)}
+function power(){
+ if(p.dead||p.cool>0)return;
+ if(p.carry){if(releaseIce(p,level,{throwing:true})){p.cool=.32;tone(530)}else $('status').textContent='No room to throw here.';return}
+ if((keys.has('ArrowDown')||keys.has('KeyS'))&&smashIce(p,level,iceBurst)){p.cool=.32;return}
+ if(p.cool>0||p.power==='none'||p.crouch||p.dead)return;p.cool=.32;
  if(p.power==='cloud'){if(p.charges>0){clouds.push({x:p.x-30,y:p.y+p.h+14,w:100,h:14,life:4});p.charges--;tone(660)}}
  else if(p.power==='helicopter'){if(p.boost){p.vy=-720;p.boost=false;tone(740)}}
  else{shots.push({x:p.x+(p.face>0?p.w:-16),y:p.y+p.h*.4,w:16,h:16,vx:p.face*(p.power==='hammer'?340:430),vy:p.power==='hammer'?-430:-80,type:p.power,life:2.4});tone(p.power==='ice'?800:400)}
@@ -119,7 +127,9 @@ function update(dt){
  const result=stepPlayer(p,input,dt,level,clouds,bumpBlock);
  if(result.jumped)tone(520);
  for(const trial of level.cloudTrials||[])if(p.x>=trial.edge-80&&p.x<trial.edge&&p.state!==STATES.CLOUD){p.x=trial.edge-81;p.vx=0;$('status').textContent='Cloud passage: collect the Cloud flower before crossing. C retries this trial.'}
+ if(pressed.has('KeyE')||pressed.has('KeyJ'))interactIce();
  if(pressed.has('KeyX')||pressed.has('KeyK'))power();
+ stepCarriedAndThrown(level,p,dt,iceBurst);
  for(const block of level.blocks){block.bump=Math.max(0,(block.bump||0)-dt);block.impactLock=Math.max(0,(block.impactLock||0)-dt)}
  for(const b of clouds)b.life-=dt;
  clouds=clouds.filter(b=>b.life>0);
@@ -131,7 +141,7 @@ function update(dt){
  if(p.y>620){die('fall');return}
  for(const c of level.coins)if(!c.taken&&overlap(p,{x:c.x-9,y:c.y-9,w:18,h:18})){c.taken=true;collectCoin();tone(1100,.04);burst(c.x,c.y,'#f7cd69')}
  stepEnemies(level,p,dt,shots);
- for(const e of level.enemies){if(!e.alive||e.kind==='plant'&&!e.active&&e.frozen<=0)continue;
+ for(const e of level.enemies){if(!e.alive||e.iceState==='carried'||e.iceState==='thrown'||e.iceState==='frozen'&&e.kind!=='plant'||e.thawGrace>0||e.kind==='plant'&&!e.active&&e.frozen<=0)continue;
  if(overlap(p,e)){if(e.frozen>0||e.kind!=='plant'&&p.vy>0&&oldY+p.h<=e.y+15){strikeEnemy(e,'stomp');p.vy=-390;burst(e.x,e.y,'#bd91dc');tone(260)}else hit();if(mode!=='play')return;}}
  const boss=level.chief;
  if(boss&&boss.hp>0){if(level.index===16)stepFinalBoss(boss,p,dt,shots);else{boss.cool-=dt;boss.timer+=dt;boss.x+=Math.sin(clock*1.1)*55*dt;
@@ -139,10 +149,10 @@ function update(dt){
  if(overlap(p,boss)){if(p.vy>0&&oldY+p.h<=boss.y+20){if(boss.cool<=0){boss.hp--;boss.cool=.65;burst(boss.x,boss.y,'#f7cd69')}p.vy=-570}else hit();if(mode!=='play')return;}
  }
  for(const s of shots){s.life-=dt;const before=s.y;s.x+=s.vx*dt;s.vy+=(s.gravity??(s.type==='hammer'?1100:600))*dt;s.y+=s.vy*dt;
- if(s.type!=='hammer'||s.owner==='enemy')for(const b of solidsFor(level))if(overlap(s,b)){if(s.type==='enemy')s.life=0;else if(s.vy>0&&before+s.h<=b.y+12){s.y=b.y-s.h;s.vy=-260}else s.life=0}
+ if(s.type!=='hammer'||s.owner==='enemy')for(const b of solidsFor(level))if(overlap(s,b)){if(s.type==='enemy')s.life=0;else if(level.enemies.includes(b)){strikeEnemy(b,s.type);s.life=0;burst(s.x,s.y,'#b6edff')}else if(s.vy>0&&before+s.h<=b.y+12){s.y=b.y-s.h;s.vy=-260}else s.life=0}
  if(s.life<=0)continue;
  if(s.type==='enemy'){if(overlap(p,s)){hit();s.life=0}}else{
- for(const e of level.enemies)if(e.alive&&overlap(s,e)){strikeEnemy(e,s.type);s.life=0;burst(e.x,e.y,colors[s.type])}
+ for(const e of level.enemies)if(e.alive&&e.iceState!=='carried'&&e.iceState!=='thrown'&&overlap(s,e)){strikeEnemy(e,s.type);s.life=0;burst(e.x,e.y,colors[s.type])}
  if(boss&&boss.hp>0&&overlap(s,boss)){s.life=0;if(bossProjectileAllowed(level.index,s.type)&&boss.cool<=0){boss.hp--;boss.cool=.4;burst(boss.x,boss.y,colors[s.type]);tone(190)}else if(!bossProjectileAllowed(level.index,s.type)){burst(s.x,s.y,'#b6e7ed');$('status').textContent='The Sentinel resists ice. Use Fire, Hammer or a stomp.'}}
  }}
  if(mode!=='play')return;
@@ -177,6 +187,7 @@ function draw(){
  for(const a of particles){ctx.globalAlpha=Math.max(0,a.life/.6);rect(a.x,a.y,4,4,a.color);ctx.globalAlpha=1}
  ctx.restore();
  rect(16,14,280,62,'#10283ad9');text('JARVIS',30,36,12,'#8bd7c0');text(p.state,30,61,14,'#f0dba1');text((runState.coins||0)+'/50',123,59,14,'#f7cd69');text(p.power.toUpperCase(),195,37,10,colors[p.power]);text(p.power==='cloud'?p.charges+' clouds':'X · POWER',195,58,10,'#dae8ee');
+ if(p.carry){rect(280,496,400,30,'#10283add');text('ICE: E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
  if(lifeNotice>0)text('1-UP! EXTRA LIFE',480,100,20,'#a3f093','center');
  rect(650,14,182,62,'#10283ad9');text('LIVES '+runState.lives,662,37,14,'#f7cd69');text('TIME '+Math.ceil(remaining),662,60,14,remaining<=60?'#ff9b87':'#e5eeec');
  text(level.boss?'BOSS STAGE':'STAGE '+(level.index>8?level.index:level.index+1),930,36,12,'#fff','right');
@@ -197,5 +208,5 @@ document.addEventListener('keydown',e=>{if(mode==='map'){if(['ArrowLeft','ArrowR
 document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='Space')entryHeld=false});
 window.addEventListener('blur',()=>{entryHeld=false;keys.clear();pressed.clear();if(mode==='play')pause()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='play')pause()});
-document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
+document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);canvas.focus();keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
 showMap();requestAnimationFrame(frame);

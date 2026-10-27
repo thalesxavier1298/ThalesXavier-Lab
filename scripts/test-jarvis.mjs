@@ -1,3 +1,4 @@
+import {ICE,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from '../public/jarvis/ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,addHiddenBlocks,standsOnBlock} from '../public/jarvis/objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,enemyShot} from '../public/jarvis/encounters.mjs';
 import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from '../public/jarvis/map.mjs';
@@ -110,7 +111,7 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
@@ -346,7 +347,7 @@ test('new rivals introduce distinct telegraphs, projectile arcs, jumping and arm
   if(kind==='hammer')assert(shots.some(s=>s.gravity===900&&s.vy<0));if(kind==='jumper')assert(sawJump);
   e.hp=2;e.hurt=0;e.frozen=0;e.alive=true;assert(strikeEnemy(e,'fire'));assert.equal(e.hp,1);assert(e.alive);assert(!strikeEnemy(e,'fire'));e.hurt=0;assert(strikeEnemy(e,'hammer'));assert(!e.alive);
  }
- const l=makeLevel(4),plant=l.enemies.find(e=>e.kind==='plant');l.enemies=[plant];const p=grounded();p.x=plant.x+180;assert(!plant.active);for(let n=0;n<330;n++)stepEnemies(l,p,1/120,[]);assert(plant.active);assert(!strikeEnemy(plant,'stomp'));assert(strikeEnemy(plant,'ice'));assert.equal(plant.frozen,4);assert(strikeEnemy(plant,'stomp'));assert(!plant.alive);
+ const l=makeLevel(4),plant=l.enemies.find(e=>e.kind==='plant');l.enemies=[plant];const p=grounded();p.x=plant.x+180;assert(!plant.active);for(let n=0;n<330;n++)stepEnemies(l,p,1/120,[]);assert(plant.active);assert(!strikeEnemy(plant,'stomp'));assert(strikeEnemy(plant,'ice'));assert.equal(plant.frozen,ICE.duration);assert(strikeEnemy(plant,'stomp'));assert(!plant.alive);
  const shots=[];for(let n=0;n<100;n++)enemyShot(shots,{x:0,y:0,w:30},{x:200},'fire');assert.equal(shots.length,24);
 });
 test('enemy projectiles hit once, expire and stop at terrain; frozen rivals stop moving',()=>{
@@ -414,7 +415,7 @@ test('hidden reveal refuses overlapping bodies and platforms instead of trapping
  const b={x:200,y:300,w:32,h:32,hidden:true,revealed:false};const e={x:205,y:305,w:30,h:32,alive:true};
  const l={enemies:[e],moving:[],falling:[]};assert(!revealBlock(b,l));assert(!b.revealed);e.x=400;
  l.moving=[{x:201,y:310,w:100,h:20}];assert(!revealBlock(b,l));l.moving=[];
- assert(!revealBlock(b,l,[{x:202,y:300,w:28,h:28,taken:false}]));assert(revealBlock(b,l,[]));
+ assert(!revealBlock(b,l,[{x:202,y:300,w:28,h:28,taken:false}]));assert(revealBlock(b,l,[]));b.revealed=false;l.enemies=[];const holder=createPlayer(170,300);holder.carry={w:30,h:32};assert(!revealBlock(b,l,[],holder));
 });
 test('authored hidden coin blocks are optional, reachable by Small and reset on new attempts',()=>{
  let total=0;
@@ -442,6 +443,25 @@ test('real head bumps affect patrols on item, spent and brick blocks; broken sup
   if(kind==='brick'&&state==='SUPER'){assert.equal(run('level.enemies[0].y+level.enemies[0].h'),470)}
  }
  for(const i of [7,11]){const l=makeLevel(i);assert(l.enemies.some(e=>l.blocks.some(b=>standsOnBlock(e,b))))}
+});
+
+
+function heldFixture(stage=0){run('start('+stage+');transformPlayer(p,STATES.FIRE,solidsFor(level));var held={x:p.x+45,y:p.y+p.h-32,w:30,h:32,kind:"basic",hp:1,alive:true,hurt:0,frozen:0,vx:25,vy:0,min:p.x,max:p.x+100,ground:true,age:0,attack:0,jumpTimer:0};level.enemies=[held];freezeEnemy(held);pressed.add("KeyE");update(1/120)');assert.equal(run('p.carry===held'),true)}
+test('real interaction keys pick, drop and throw; carried ice takes priority over Fire power',()=>{
+ heldFixture();run('pressed.add("KeyX");update(1/120)');assert.equal(run('p.carry'),null);assert.equal(run('held.iceState'),'thrown');assert.equal(run('shots.length'),0);
+ heldFixture();run('pressed.add("KeyJ");update(1/120)');assert.equal(run('p.carry'),null);assert.equal(run('held.iceState'),'frozen');
+ run('p.cool=0;keys.add("ArrowDown");pressed.add("KeyK");update(1/120)');assert.equal(run('held.alive'),false);assert.equal(run('shots.length'),0);
+});
+test('pause freezes held objects and timers; damage drops safely without restoring an active enemy',()=>{
+ heldFixture();const timer=run('held.frozen');run('pause();last=0;frame(100);frame(2000)');assert.equal(run('held.frozen'),timer);assert.equal(run('held.iceState'),'carried');
+ run('pause();p.inv=0;hit()');assert.equal(run('p.carry'),null);assert(['frozen','broken'].includes(run('held.iceState')));assert.equal(run('p.state'),'SUPER');
+});
+test('all stage exit and retry paths discard carried references without saving objects',()=>{
+ for(const action of ['showMap()','quitLevel()','start(1)','respawn()','die()','win()','gameOver()']){
+  heldFixture();run(action);assert.equal(run('p?.carry??null'),null,action);assert.equal(run('held.alive'),false,action);
+ }
+ heldFixture(4);run('p.x=level.cloudTrials[0].start+60;retryCloudTrial()');assert.equal(run('p.carry'),null);assert.equal(run('held.alive'),false);
+ const data=readRun({getItem:k=>storage.get(k)});assert(!('carry' in data));
 });
 
 console.log(count+' test groups passed.');

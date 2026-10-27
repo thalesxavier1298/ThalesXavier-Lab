@@ -1,4 +1,4 @@
-import {intersects,canFit,moveBody,solidsFor} from './physics.mjs';
+import {intersects,canFit,moveBody,solidsFor,carryBox} from './physics.mjs';
 export {solidsFor} from './physics.mjs';
 export function hazardState(h,time){
  if(h.kind==='spikes')return 'active';
@@ -24,7 +24,7 @@ function moveRail(level,b,p,dt){
   if(!canFit(p,other)||Math.abs(p.x-body.x-dx)>.2||Math.abs(p.y-body.y-dy)>.2){
    Object.assign(p,body);b.direction=-old.direction;b.dx=0;b.dy=0;return;
   }
- }else if(intersects({...b,x,y},p)){
+ }else if(intersects({...b,x,y},p)||p.carry&&intersects({...b,x,y},carryBox(p))){
   // Side/underside contacts stop and reverse; lifts never push into terrain.
   b.direction=-old.direction;b.dx=0;b.dy=0;return;
  }
@@ -42,7 +42,7 @@ export function stepWorld(level,p,dt){
    if(b.timer<=0){b.state='waiting';b.timer=.1}
   }else if(b.state==='waiting'){
    const home={...b,x:b.originX,y:b.originY};
-   if(!intersects(p,home)){b.x=b.originX;b.y=b.originY;b.vy=0;b.state='ready';b.timer=0}
+   if(!intersects(p,home)&&!(p.carry&&intersects(carryBox(p),home))&&!(level.enemies||[]).some(e=>e.alive&&e.iceState==='frozen'&&intersects(e,home))){b.x=b.originX;b.y=b.originY;b.vy=0;b.state='ready';b.timer=0}
   }
  }
  for(const h of level.hazards||[])h.state=hazardState(h,level.time);

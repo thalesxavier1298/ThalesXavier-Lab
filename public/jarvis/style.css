@@ -17,3 +17,5 @@ button{box-shadow:inset -2px -2px #0003}
 .run-guide{margin:0 12px 30px;padding:20px;border:1px solid #8bd7c04d;background:#183249}.run-guide b{color:#f7cd69;font-size:12px}.run-guide p{font-size:12px;color:#b8ced4;line-height:1.8;max-width:900px}
 
 .map-controls{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 15px}.map-controls button{min-width:44px;min-height:44px}#map-selected{padding:0 20px;color:#f7cd69}#map-jarvis{pointer-events:none}#island-map{overflow-x:auto}#island-map svg{min-width:650px}
+
+.touch{flex-wrap:wrap}

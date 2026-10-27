@@ -1,8 +1,9 @@
-import {intersects} from './physics.mjs';
+import {intersects,carryBox} from './physics.mjs';
 import {strikeEnemy} from './encounters.mjs';
 export function standsOnBlock(e,b){return e.alive&&Math.abs(e.y+e.h-b.y)<=2&&e.x+e.w>b.x+1&&e.x<b.x+b.w-1&&Math.abs(e.vy||0)<2}
-export function revealBlock(b,level,items=[]){
+export function revealBlock(b,level,items=[],player=null){
  if(!b.hidden||b.revealed)return true;
+ if(player?.carry&&intersects(b,carryBox(player)))return false;
  const occupants=[...(level.enemies||[]).filter(e=>e.alive),...(level.moving||[]),...(level.falling||[]).filter(e=>e.state!=='waiting'),...items.filter(i=>!i.taken)];
  if(occupants.some(e=>intersects(b,e)))return false;
  b.revealed=true;return true;
