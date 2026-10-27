@@ -222,4 +222,33 @@ test('stage widths rise gradually, timers allow ample exploration, and all retur
   assert(l.blocks.every(b=>!b.reusable));
  }
 });
+
+test('coin boxes award one coin without replacing a power, and remain spent',()=>{
+ run('start(0);transformPlayer(p,STATES.FIRE,solidsFor(level));var coinBox=level.blocks.find(b=>b.content==="coin");bumpBlock(coinBox);for(let n=0;n<60;n++)update(1/120)');
+ assert.equal(run('score'),1);assert.equal(run('p.state'),'FIRE');run('bumpBlock(coinBox);for(let n=0;n<60;n++)update(1/120)');assert.equal(run('score'),1);
+ for(let i=0;i<17;i++){const l=makeLevel(i);assert(l.blocks.some(b=>b.content==='coin'));assert(l.blocks.some(b=>b.content==='power'))}
+});
+test('cloud has three charges total; landing never refills, another flower does',()=>{
+ run('start(0);transformPlayer(p,STATES.CLOUD,solidsFor(level));for(let n=0;n<4;n++){p.cool=0;power()}');
+ assert.equal(run('clouds.length'),3);assert.equal(run('p.charges'),0);
+ run('for(let n=0;n<60;n++)update(1/120)');assert.equal(run('p.charges'),0);
+ run('items.push(createItem("cloud",p.x+14,p.y+28));update(1/120)');assert.equal(run('p.charges'),3);
+});
+test('cleared form persists through map, next stage and storage; Cloud gets three fresh charges',()=>{
+ for(const state of Object.values(STATES)){
+  run('resetLives(runState);runState.state=STATES.SMALL;start(0);transformPlayer(p,STATES.'+state+',solidsFor(level));p.charges=0;win();showMap();start(1)');
+  assert.equal(run('p.state'),state);assert.equal(run('p.charges'),3);
+  assert.equal(readRun({getItem:k=>storage.get(k)??null}).state,state);
+ }
+ run('p.y=700;update(1/120);deathScreen()');node('continue').onclick();assert.equal(run('p.state'),'SMALL');assert.equal(run('runState.state'),'SMALL');
+});
+test('boss landmarks and fortress interiors are distinct; lava instantly kills every form',()=>{
+ assert.equal(makeLevel(8).theme,'tower');assert.equal(makeLevel(16).theme,'castle');assert(makeLevel(16).lava.length>=3);
+ run('renderMap()');assert(node('island-map').innerHTML.includes('aria-hidden="true"'));
+ for(const state of Object.values(STATES)){
+  run('resetLives(runState);start(16);transformPlayer(p,STATES.'+state+',solidsFor(level));p.inv=999;var lava=level.lava[0];p.x=lava.x+40;p.y=lava.y;update(1/120)');
+  assert.equal(run('mode'),'dying');assert.equal(run('deathReason'),'lava');assert.equal(run('runState.lives'),4);run('die("lava")');assert.equal(run('runState.lives'),4);
+ }
+});
+
 console.log(count+' test groups passed.');

@@ -113,6 +113,14 @@ export function authorLevel(design){
  for(const c of d.extraCheckpoints||[]){addBox(c.x+45,c.top);addBox(c.x+98,c.top)}
  addBox(d.width-200,470);
  for(const [x,top] of d.stations||[])addBox(x,top);
+ for(const b of blocks)if(b.kind==='item'){b.content=checkpoints.some(c=>b.x>=c.x&&b.x<c.x+140)?'power':'coin'}
+ for(const floor of platforms){
+  if(floor.w<650)continue;
+  for(let x=floor.x+240;x<floor.x+floor.w-220;x+=180){
+   const b=station(x,floor.y,d.power);b.content='coin';
+   if(!platforms.some(t=>overlaps(b,t))&&!blocks.some(t=>overlaps({...b,x:b.x-16,w:b.w+32},t))&&!(d.hazards||[]).some(h=>Math.abs(h.x-x)<85))blocks.push(b);
+  }
+ }
  // Marked ledges carry deliberate coin trails, not a uniform line across the world.
  const coins=[];
  for(const b of platforms.filter(b=>b.h<40))for(let x=b.x+30;x<b.x+b.w-15;x+=38)coins.push({x,y:b.y-30,taken:false});
@@ -124,3 +132,4 @@ export function authorLevel(design){
  checkpoints,
  pickups:blocks.filter(b=>b.kind==='item').map(b=>({x:b.x+16,y:b.y,type:b.power})),chief:null,goal:d.width-120,goalY:470,time:0};
 }
+

@@ -9,7 +9,7 @@ export function createPlayer(x=80,y=360){
 function applyState(p,state){p.state=state;p.power=special(state)?state.toLowerCase():'none';p.charges=3;p.boost=true}
 export function transformPlayer(p,state,solids,{animate=true}={}){
  if(!Object.values(STATES).includes(state))return false;
- if(state===p.state){p.pending=null;return true}
+ if(state===p.state){if(state===STATES.CLOUD)p.charges=3;p.pending=null;return true}
  const height=state===STATES.SMALL?C.smallHeight:C.largeHeight;
  if(height>p.h&&!resizeFeet(p,height,solids)){p.pending=state;return false}
  if(height<p.h)resizeFeet(p,height,solids);
@@ -51,7 +51,7 @@ export function stepPlayer(p,input,dt,level,clouds,onHead=()=>{}){
  if(p.state===STATES.HELICOPTER&&input.held&&p.vy>100)p.vy=100;
  moveBody(p,dt,solids,clouds,onHead);
  p.x=Math.max(0,Math.min(level.width-p.w,p.x));
- if(p.ground){p.charges=3;p.boost=true;if(!wasGround)p.landing=.09}
+ if(p.ground){p.boost=true;if(!wasGround)p.landing=.09}
  // Prevent coyote time from being re-used after a jump.
  if(jumped)p.coyote=0;
  animation(p,dt);

@@ -24,16 +24,16 @@ function renderMap(){
  const route=coords.map(v=>v.x+','+v.y).join(' ');
  $('island-map').innerHTML='<svg viewBox="0 0 960 445" role="group" aria-label="World map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".25"/></filter></defs><path d="M30 60 Q200 -5 370 65 T730 55 Q960 10 930 240 Q970 430 730 410 Q510 475 330 405 Q20 460 20 250Z" fill="#477265" opacity=".5"/><path d="M40 65 Q270 15 445 72 T910 76" fill="none" stroke="#8cb58b" stroke-width="2" opacity=".25"/><polyline points="'+route+'" fill="none" stroke="#102e3b" stroke-width="14" stroke-linejoin="round"/><polyline points="'+route+'" fill="none" stroke="#6b938b" stroke-width="3" stroke-dasharray="5 9"/>'+STAGES.map((s,i)=>{
  const {x,y}=coords[i],locked=i>unlocked,done=i<unlocked,label=s.boss?(i===8?'TOWER':'CASTLE'):String(i>8?i:i+1).padStart(2,'0');
- return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(i===unlocked?'<text x="'+x+'" y="'+(y-39)+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
+ return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(s.boss?'<g transform="translate('+(x-42)+' '+(y-91)+')" aria-hidden="true"><path d="'+(i===8?'M20 64V12H12V0H26V8H38V0H52V8H66V0H78V12H70V64Z':'M0 64V24H12V10H4V0H20V8H30V0H46V24H58V0H74V8H84V0H100V10H92V64Z')+'" fill="#71849b" stroke="#e5d5aa" stroke-width="3"/><path d="M34 64V44Q45 26 56 44V64" fill="#192539"/><path d="M40 18H48V30H40Z" fill="#ffd27d"/></g>':'')+(i===unlocked?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'</svg>';
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(i<=unlocked)start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();go()}}});
 }
 function showMap(){mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
 $('reset').onclick=()=>{if(confirm('Reset all Jarvis stage progress on this device?')){unlocked=0;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){level=makeLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();checkpoint=0;score=0;accumulator=0;respawn();$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
-function respawn(){
- const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;p.inv=PHYSICS.invincibility;
+function start(i){level=makeLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();checkpoint=0;score=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+function respawn(state=STATES.SMALL){
+ const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;transformPlayer(p,state,solidsFor(level),{animate:false});p.inv=PHYSICS.invincibility;
  shots=[];clouds=[];particles=[];items=fresh.items;remaining=level.timeLimit;
  keys.clear();pressed.clear();camera=Math.max(0,Math.min(level.width-960,p.x-300));
 }
@@ -42,7 +42,7 @@ function pause(){if(mode==='play'){mode='paused';$('pause').textContent='Resume'
 $('pause').onclick=pause;
 function die(reason='hit'){
  if(mode!=='play')return;
- deathReason=reason;loseLife(runState);persistRun();mode='dying';deathTimer=.75;p.dead=true;p.anim='death';p.animTime=0;p.vy=-330;tone(100,.3);
+ deathReason=reason;runState.state=STATES.SMALL;loseLife(runState);persistRun();mode='dying';deathTimer=.75;p.dead=true;p.anim='death';p.animTime=0;p.vy=-330;tone(100,.3);
  keys.clear();pressed.clear();
 }
 function gameOver(){
@@ -60,7 +60,7 @@ function deathScreen(){
  const i=level.index,cp=checkpoint;start(i);checkpoint=cp;respawn();mode='play';$('overlay').hidden=true;
  });
 }
-function win(){mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
+function win(){runState.state=p.state;persistRun();mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
 function hit(){
  const result=damagePlayer(p,solidsFor(level));
  if(result==='dead')die();
@@ -96,10 +96,11 @@ function update(dt){
  for(const block of level.blocks)block.bump=Math.max(0,(block.bump||0)-dt);
  for(const b of clouds)b.life-=dt;
  clouds=clouds.filter(b=>b.life>0);
- stepItems(items,dt,level,p,item=>{tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+'. Shift to run; X to use a special power.'});
+ stepItems(items,dt,level,p,item=>{if(item.type==='coin'){score++;burst(item.x+14,item.y+14,'#f7cd69');tone(1100,.04);return}tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+'. Shift to run; X to use a special power.'});
  const reached=checkpointReached(level,p,checkpoint);
  if(reached!==checkpoint){checkpoint=reached;$('status').textContent='Checkpoint reached — safe return and item boxes.';tone(900)}
  for(const h of level.hazards)if(h.state==='active'&&overlap(p,h)){hit();if(mode!=='play')return}
+ for(const lava of level.lava||[])if(overlap(p,lava)){die('lava');return}
  if(p.y>620){die('fall');return}
  for(const c of level.coins)if(!c.taken&&overlap(p,{x:c.x-9,y:c.y-9,w:18,h:18})){c.taken=true;score++;tone(1100,.04);burst(c.x,c.y,'#f7cd69')}
  for(const e of level.enemies){if(!e.alive)continue;if(e.frozen>0)e.frozen-=dt;else{e.x+=e.vx*dt;if(e.x<e.min||e.x>e.max)e.vx*=-1}

@@ -4,9 +4,23 @@ const palettes={
  ember:{sky:'#c28ea1',far:'#a97586',near:'#7e5d7f',grass:'#f5c47c',edge:'#aa785c',soil:'#8a6270',dark:'#55435f',light:'#b4827c'},
  storm:{sky:'#323d70',far:'#535b8b',near:'#344d78',grass:'#afc4c0',edge:'#758caa',soil:'#5d6586',dark:'#3e4665',light:'#818ca2'}
 };
+palettes.tower={sky:'#202431',far:'#343d50',near:'#47536a',grass:'#b0bdcb',edge:'#64748b',soil:'#59667c',dark:'#303a50',light:'#8291a5'};
+palettes.castle={sky:'#251e2b',far:'#443044',near:'#684254',grass:'#c7a38b',edge:'#7e5960',soil:'#665365',dark:'#392c40',light:'#927384'};
 const r=(ctx,x,y,w,h,color)=>{ctx.fillStyle=color;ctx.fillRect(Math.round(x/2)*2,Math.round(y/2)*2,Math.ceil(w/2)*2,Math.ceil(h/2)*2)};
 export function background(ctx,theme,camera,time){
  const c=palettes[theme];r(ctx,0,0,960,540,c.sky);
+ if(theme==='tower'||theme==='castle'){
+  // Interior masonry, deep arched windows, columns and animated torchlight.
+  for(let y=0;y<540;y+=40)for(let x=-80;x<1040;x+=80){const sx=x-(camera*.12)%80+(y/40%2)*40;r(ctx,sx,y,78,38,c.far);r(ctx,sx+3,y+3,72,2,c.near)}
+  for(let i=-1;i<6;i++){const x=i*240-(camera*.3)%240;
+   r(ctx,x+40,82,90,176,c.dark);r(ctx,x+50,68,70,190,c.dark);r(ctx,x+62,58,46,200,c.dark);
+   r(ctx,x+80,74,8,184,c.near);r(ctx,x+48,157,76,8,c.near);
+   r(ctx,x+178,0,28,470,c.near);r(ctx,x+170,0,44,24,c.grass);r(ctx,x+170,442,44,28,c.edge);
+   r(ctx,x+190,280,6,42,'#5d3c3e');const flicker=Math.floor(time*10+i)%3;
+   r(ctx,x+184,258-flicker*3,18,28+flicker*3,'#e87b49');r(ctx,x+190,264-flicker*2,6,18,'#ffe3a0');
+   if(theme==='castle'){r(ctx,x+8,94,18,104,'#903e4d');r(ctx,x+10,96,14,12,'#d8b069')}
+  }return;
+ }
  r(ctx,774,62,52,52,theme==='storm'?'#f4efd1':'#fff0b5');r(ctx,766,72,68,32,theme==='storm'?'#f4efd1':'#fff0b5');
  if(theme==='storm')for(let i=0;i<25;i++)r(ctx,(i*137)%960,(i*73)%230,2,2,'#bacbdc');
  for(let i=-1;i<7;i++){const x=i*205-(camera*.15)%205;
@@ -33,7 +47,7 @@ export function terrain(ctx,platforms,theme,camera){
   for(let x=b.x+4;x<b.x+b.w-8;x+=18){r(ctx,x,b.y+6,4,8,c.grass);r(ctx,x+6,b.y+3,8,2,'#e3e8ab')}
   r(ctx,b.x,b.y+10,4,b.h-10,c.dark);r(ctx,b.x+b.w-4,b.y+10,4,b.h-10,c.dark);
   // Decoration is non-colliding and only sits on the existing terrain.
-  if(b.h>50)for(let x=b.x+60;x<b.x+b.w-30;x+=115){
+  if(b.h>50&&theme!=='tower'&&theme!=='castle')for(let x=b.x+60;x<b.x+b.w-30;x+=115){
    r(ctx,x,b.y-10,4,10,c.edge);r(ctx,x-6,b.y-6,6,2,c.grass);r(ctx,x+4,b.y-8,6,2,c.grass);
    r(ctx,x+24,b.y-12,2,12,c.edge);r(ctx,x+20,b.y-16,10,6,theme==='frost'?'#f6faf9':'#f1d98b');
   }
@@ -48,6 +62,10 @@ export function drawBlocks(ctx,blocks,time){
 }
 
 export function drawMechanics(ctx,level,player,checkpoint,time){
+ for(const lava of level.lava||[]){
+  r(ctx,lava.x,lava.y,lava.w,lava.h,'#bd3b37');
+  for(let x=lava.x;x<lava.x+lava.w;x+=16){const wave=Math.sin(time*4+x*.06)*3;r(ctx,x,lava.y+wave,16,8,'#ffbf5f');r(ctx,x,lava.y+10+wave,16,14,'#f47742');}
+ }
  for(const b of level.moving||[]){
   // Dotted travel guides distinguish moving routes from solid scenery.
   const dx=b.toX-b.originX,dy=b.toY-b.originY,len=Math.hypot(dx,dy);

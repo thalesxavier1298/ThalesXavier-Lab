@@ -72,6 +72,7 @@ export function drawItem(ctx,item,time){
  const x=Math.round(item.x),y=Math.round(item.y+(item.type==='super'?0:Math.sin(time*3)*3)+(item.emerge>0?item.emerge/.35*28:0));
  const color=item.type==='super'?'#a3e477':STATE_COLORS[item.type.toUpperCase()]||'#a8e978';
  const r=(a,b,w,h,c)=>{ctx.fillStyle=c;ctx.fillRect(x+a,y+b,w,h)};
+ if(item.type==='coin'){r(8,2,12,24,'#d99435');r(4,6,20,16,'#f7cd69');r(12,6,4,16,'#fff0a4');return}
  if(item.type==='super'||item.type==='helicopter'){
   r(8,2,12,2,'#173950');r(4,4,20,4,color);r(2,8,24,8,color);r(0,14,28,4,'#173950');
   r(8,18,12,8,'#ffe0ab');r(10,20,2,3,'#173950');r(16,20,2,3,'#173950');
