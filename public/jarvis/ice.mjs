@@ -25,12 +25,12 @@ export function stepFrozen(e,level,p,dt){
 function freeBox(box,level,p,except){return box.x>=0&&box.x+box.w<=level.width&&!intersects(box,p)&&!solidsFor(level,except).some(b=>intersects(box,b))&&!level.enemies.some(e=>e!==except&&e.alive&&e.iceState!=='carried'&&intersects(box,e))}
 export function pickIce(p,level){
  if(p.carry)return false;
- const candidates=level.enemies.filter(e=>e.alive&&e.iceState==='frozen'&&!['plant','fireplant'].includes(e.kind)&&Math.abs((e.x+e.w/2)-(p.x+p.w/2))<=70&&Math.abs((e.y+e.h/2)-(p.y+p.h/2))<=55).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x));
+ const candidates=level.enemies.filter(e=>e.alive&&(e.iceState==='frozen'||e.kind==='shell'&&e.shellMode==='idle'&&(!e.iceState||e.iceState==='normal'))&&!['plant','fireplant'].includes(e.kind)&&Math.abs((e.x+e.w/2)-(p.x+p.w/2))<=70&&Math.abs((e.y+e.h/2)-(p.y+p.h/2))<=55).sort((a,b)=>Math.abs(a.x-p.x)-Math.abs(b.x-p.x));
  for(const e of candidates){
   const pose=carryBox({...p,carry:e}),steps=Math.max(1,Math.ceil(Math.hypot(pose.x-e.x,pose.y-e.y)/4));let clear=true;
   for(let n=1;n<=steps;n++){const box={...e,x:e.x+(pose.x-e.x)*n/steps,y:e.y+(pose.y-e.y)*n/steps};if(solidsFor(level,e).some(b=>intersects(box,b))){clear=false;break}}
   if(!clear||!freeBox(pose,level,p,e))continue;
-  p.carry=e;e.iceState='carried';e.vx=0;e.vy=0;Object.assign(e,pose);return true;
+  p.carry=e;e.carryType=e.iceState==='frozen'?'ice':'shell';e.iceState='carried';e.vx=0;e.vy=0;Object.assign(e,pose);return true;
  }return false;
 }
 export function releaseIce(p,level,{throwing=false,force=false,onBreak=()=>{}}={}){
@@ -38,7 +38,9 @@ export function releaseIce(p,level,{throwing=false,force=false,onBreak=()=>{}}={
  const face=p.face||1,candidates=[carryBox(p),{...carryBox(p),x:face>0?p.x+p.w+12:p.x-e.w-12}];
  const pos=candidates.find(box=>freeBox(box,level,p,e));
  if(!pos){if(force){p.carry=null;breakIce(e,onBreak)}return false}
- p.carry=null;Object.assign(e,pos);e.iceState=throwing?'thrown':'frozen';e.vx=throwing?face*ICE.throwSpeed:0;e.vy=throwing?ICE.launchVy:0;e.ground=false;e.throwHits=new Set();return true;
+ p.carry=null;Object.assign(e,pos);
+ if(e.carryType==='shell'){e.iceState='normal';e.shellMode=throwing?'slide':'idle';e.vx=throwing?face*360:0;e.vy=throwing?-150:0;e.ground=false;e.shellHits=new Set();e.contactGrace=.25;e.hurt=.15;e.carryType=null;return true}
+ e.iceState=throwing?'thrown':'frozen';e.vx=throwing?face*ICE.throwSpeed:0;e.vy=throwing?ICE.launchVy:0;e.ground=false;e.throwHits=new Set();return true;
 }
 export function clearCarry(p,onBreak=()=>{}){if(!p?.carry)return;const e=p.carry;p.carry=null;breakIce(e,onBreak)}
 export function smashIce(p,level,onBreak=()=>{}){

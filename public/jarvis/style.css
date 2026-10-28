@@ -19,3 +19,6 @@ button{box-shadow:inset -2px -2px #0003}
 .map-controls{display:flex;gap:8px;flex-wrap:wrap;padding:0 20px 15px}.map-controls button{min-width:44px;min-height:44px}#map-selected{padding:0 20px;color:#f7cd69}#map-jarvis{pointer-events:none}#island-map{overflow-x:auto}#island-map svg{min-width:650px}
 
 .touch{flex-wrap:wrap}
+
+/* Green Valley stays readable on small screens through a scrollable landscape. */
+#island-map{border-radius:14px;scroll-behavior:smooth;overscroll-behavior-x:contain}#island-map svg{min-width:900px}.selection-ring{display:none}.stage.selected .selection-ring{display:block}.stage:focus-visible .selection-ring{display:block;stroke:#fff}.stage.selected>circle:not(.selection-ring){stroke:#fff4b4;stroke-width:4}.map-copy p:last-child{max-width:620px}#map-selected{padding:8px 0;font-size:13px}.map-controls{padding-left:0}.stage text{pointer-events:none}.stage.locked{opacity:.85}

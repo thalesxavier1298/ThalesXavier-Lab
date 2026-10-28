@@ -141,6 +141,6 @@ export function stepShell(e,level,p,dt){
   if(e.shellMode==='slide')for(const t of level.enemies){if(t===e||!t.alive||t.iceState==='carried'||e.shellHits?.has(t)||!intersects(e,t))continue;
    e.shellHits??=new Set();e.shellHits.add(t);if(t.iceState==='frozen')breakIce(t);else strikeEnemy(t,'hammer');
   }
-  if(e.y>650||e.x<0||e.x>level.width||(level.lava||[]).some(b=>intersects(e,b)))e.alive=false;
+  if(e.y>650||e.x<0||e.x>level.width||(level.lava||[]).some(b=>intersects(e,b))||level.chief?.hp>0&&intersects(e,level.chief))e.alive=false;
  }
 }

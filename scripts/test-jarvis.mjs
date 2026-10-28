@@ -1,7 +1,7 @@
 import {ICE,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from '../public/jarvis/ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,addHiddenBlocks,standsOnBlock} from '../public/jarvis/objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,enemyShot} from '../public/jarvis/encounters.mjs';
-import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from '../public/jarvis/map.mjs';
+import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape} from '../public/jarvis/map.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim} from '../public/jarvis/run.mjs';
@@ -111,7 +111,7 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
@@ -260,7 +260,7 @@ test('map arrows follow visual trail bends, respect locks, animate and enter wit
  assert.equal(mapNeighbor(5,'ArrowDown',17),6);assert.equal(mapNeighbor(6,'ArrowLeft',17),7);
  assert.equal(mapNeighbor(11,'ArrowDown',17),12);assert.equal(mapNeighbor(12,'ArrowRight',17),13);
  assert.equal(mapNeighbor(0,'ArrowRight',0),0);assert.equal(mapNeighbor(0,'ArrowLeft',17),0);
- assert.deepEqual(mapPosition(0,1,.5),{x:148,y:80});
+ assert.notEqual(mapPosition(0,1,.5).y,(MAP_POINTS[0].y+MAP_POINTS[1].y)/2);
  run('unlocked=17;level=null;runState.stage=5;showMap();walkMap("ArrowDown");walkMap("ArrowLeft")');assert.equal(run('mapTravel.to'),6);
  run('enterMap()');assert.equal(run('mode'),'map');run('stepMap(.4)');assert.equal(run('mapIndex'),6);
  run('enterMap(true);update(1/120)');assert.equal(run('mode'),'play');assert.equal(run('level.index'),6);assert(run('p.ground'));assert(run('entryHeld'));
@@ -477,5 +477,47 @@ test('actual boss pause freezes jump and retry clears engagement state',()=>{
  run('start(16)');assert(!run('level.chief.engaged'));assert.equal(run('level.chief.state'),'rest');
 });
 
+
+test('stationary shell pickup shares the single carry slot and drops without launching',()=>{
+ heldFixture();run('clearCarry(p);held.alive=true;held.kind="shell";held.frozen=0;held.iceState="normal";held.shellMode="idle";held.x=p.x+45;held.y=438;held.hurt=0;pressed.add("KeyE");update(1/120)');
+ assert.equal(run('p.carry===held'),true);assert.equal(run('held.carryType'),'shell');assert.equal(run('held.frozen'),0);
+ run('pressed.add("KeyJ");update(1/120)');assert.equal(run('p.carry'),null);assert.equal(run('held.shellMode'),'idle');assert.equal(run('held.vx'),0);assert.equal(run('held.iceState'),'normal');
+});
+test('shell launch with K slides without firing the current power and respects walls and bosses',()=>{
+ run('held.x=p.x+45;held.hurt=0;pressed.add("KeyE");update(1/120)');assert(run('p.carry===held'));
+ run('p.cool=0;pressed.add("KeyK");update(1/120)');assert.equal(run('p.carry'),null);assert.equal(run('held.shellMode'),'slide');assert.equal(run('held.vx'),360);assert.equal(run('shots.length'),0);
+ run('level.chief={x:held.x+20,y:400,w:72,h:80,hp:6};stepEnemies(level,p,.05,shots)');assert.equal(run('level.chief.hp'),6);assert(!run('held.alive'));
+});
+test('moving shells cannot be picked up, nor can a frozen shell already launched',()=>{
+ const l=makeLevel(1),e=l.enemies.find(e=>e.kind==='shell'),p2=createPlayer(e.x-45,442);e.shellMode='slide';assert(!pickIce(p2,l));e.shellMode='idle';e.iceState='thrown';e.frozen=6;assert(!pickIce(p2,l));
+});
+test('shell carry damage and all exits clean references without changing saved schema',()=>{
+ for(const action of ['hit()','quitLevel()','start(1)','die()','win()','gameOver()']){
+  heldFixture();run('held.kind="shell";held.carryType="shell";held.frozen=0;held.shellMode="idle";p.inv=0;'+action);assert.equal(run('p?.carry??null'),null,action);
+ }
+});
+test('Space confirms a clear once and waits for release before entering any stage',()=>{
+ for(const i of [0,16]){run('start('+i+');onKeyUp({code:"Space"});win()');assert.equal(run('mode'),'won');assert(node('overlay-copy').textContent.includes('press Space'));
+ run('onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'map');
+ run('onKeyDown({code:"Space",repeat:true,preventDefault(){}});onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'map');
+ run('onKeyUp({code:"Space"});onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'play');assert(run('entryHeld'));
+ }
+});
+test('holding jump at the finish cannot dismiss the clear; mouse remains available',()=>{
+ run('start(0);keys.add("Space");win();onKeyDown({code:"Space",repeat:true,preventDefault(){}});onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'won');
+ run('onKeyUp({code:"Space"});onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'map');
+ run('start(0);win()');node('continue').onclick();assert.equal(run('mode'),'map');assert(!run('mapSpaceBlocked'));
+});
+test('curved map positions reverse precisely and every adjacent destination is reachable',()=>{
+ assert.equal(MAP_POINTS.length,17);assert.equal((mapRoute().match(/ Q /g)||[]).length,16);assert(mapLandscape().includes('GREEN VALLEY'));
+ for(let i=0;i<16;i++){assert.deepEqual(mapPosition(i,i+1,0),MAP_POINTS[i]);assert.deepEqual(mapPosition(i,i+1,1),MAP_POINTS[i+1]);
+  for(const t of [.2,.5,.8]){const a=mapPosition(i,i+1,t),b=mapPosition(i+1,i,1-t);assert(Math.hypot(a.x-b.x,a.y-b.y)<.00001)}
+  assert(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].some(k=>mapNeighbor(i,k,17)===i+1));assert(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].some(k=>mapNeighbor(i+1,k,17)===i));assert(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].every(k=>mapNeighbor(i,k,i)<=i));
+ }
+});
+test('Green Valley map preserves 17 destinations and selects the current node',()=>{
+ run('unlocked=17;runState.stage=0;level=null;showMap()');assert.equal(node('world-title').textContent,'GREEN VALLEY');assert.equal((node('island-map').innerHTML.match(/data-stage=/g)||[]).length,17);assert(node('island-map').innerHTML.includes(' selected'));
+ for(const at of MAP_POINTS)assert(at.x>40&&at.x<930&&at.y>60&&at.y<700);
+});
 console.log(count+' test groups passed.');
 

@@ -1,7 +1,7 @@
 import {pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from './ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed} from './objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy} from './encounters.mjs';
-import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg} from './map.mjs';
+import {MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape} from './map.mjs';
 import {STAGES,makeLevel,overlap,readProgress} from './levels.mjs';
 import {PHYSICS,STATES} from './config.mjs';
 import {createPlayer,stepPlayer,damagePlayer,transformPlayer} from './player.mjs';
@@ -14,7 +14,7 @@ const $=id=>document.getElementById(id),canvas=$('game'),ctx=canvas.getContext('
 let unlocked;try{unlocked=readProgress(localStorage)}catch{unlocked=0}
 let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],particles=[],camera=0,mode='map',last=0,clock=0,score=0,checkpoint=0,sound=false,audio=null,items=[],deathTimer=0,accumulator=0;
 let runState;try{runState=readRun(localStorage)}catch{runState={lives:INITIAL_LIVES,stage:0}}
-let lifeNotice=0;
+let lifeNotice=0,wonSpaceReady=false,mapSpaceBlocked=false;
 let remaining=0,deathReason='hit',mapIndex=0,mapTravel=null,entryHeld=false;
 function persistRun(){try{saveRun(runState,localStorage)}catch{}}
 function buildLevel(i){const l=makeLevel(i);if(runState.lifeClaims?.includes(i))for(const b of l.blocks)if(b.content==='life')b.used=true;return l}
@@ -29,11 +29,12 @@ $('sound').onclick=()=>{sound=!sound;$('sound').textContent=sound?'Sound on':'So
 function renderMap(){
  $('progress').textContent=Math.min(unlocked,17)+' / 17 cleared · Lives '+runState.lives+' · Coins '+(runState.coins||0)+'/50';
  const coords=MAP_POINTS;
- const route=coords.map(v=>v.x+','+v.y).join(' ');
- $('island-map').innerHTML='<svg viewBox="0 0 960 540" role="group" aria-label="World map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="8" stdDeviation="8" flood-opacity=".25"/></filter></defs><path d="M20 20H940V510H20Z" fill="#477265" opacity=".5"/><path d="M40 65 Q270 15 445 72 T910 76" fill="none" stroke="#8cb58b" stroke-width="2" opacity=".25"/><polyline points="'+route+'" fill="none" stroke="#102e3b" stroke-width="14" stroke-linejoin="round"/><polyline points="'+route+'" fill="none" stroke="#6b938b" stroke-width="3" stroke-dasharray="5 9"/>'+STAGES.map((s,i)=>{
+ const route=mapRoute();
+ $('island-map').innerHTML='<svg viewBox="0 0 960 760" role="group" aria-label="Green Valley world map: 15 levels, tower and castle"><defs><filter id="shadow"><feDropShadow dx="0" dy="5" stdDeviation="3" flood-opacity=".22"/></filter></defs>'+mapLandscape()+'<path d="'+route+'" fill="none" stroke="#294c3f" stroke-width="19" stroke-linecap="round"/><path d="'+route+'" fill="none" stroke="#dfc58a" stroke-width="11" stroke-linecap="round"/><path d="'+route+'" fill="none" stroke="#fff0b2" stroke-width="2" stroke-dasharray="3 10"/>'+STAGES.map((s,i)=>{
  const {x,y}=coords[i],locked=i>unlocked,done=i<unlocked,label=s.boss?(i===8?'TOWER':'CASTLE'):String(i>8?i:i+1).padStart(2,'0');
- return '<g class="stage '+(locked?'locked':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="'+(locked?'#8da8ad':'#e8eee4')+'" style="font-size:10px">'+s.name+'</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
+ return '<g class="stage '+(locked?'locked':'')+(i===mapIndex?' selected':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><circle class="selection-ring" cx="'+x+'" cy="'+y+'" r="34" fill="none" stroke="#ffe8a2" stroke-width="3"/><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="#fff7dc" stroke="#203e37" stroke-width="4" paint-order="stroke" style="font-size:11px">'+s.name+'</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'<g id="map-jarvis" aria-hidden="true" transform="translate('+coords[mapIndex].x+' '+(coords[mapIndex].y-18)+')">'+MAP_JARVIS+'</g></svg>';
+ const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,coords[mapIndex].x*mapBox.scrollWidth/960-mapBox.clientWidth/2);
  $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter';
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(i<=unlocked)start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();entryHeld=e.key===' ';go()}}});
 }
@@ -41,8 +42,8 @@ function walkMap(key){if(mode!=='map'||mapTravel)return;const next=mapNeighbor(m
 function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel){entryHeld=holdSpace;start(mapIndex)}}
 for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map-up','ArrowUp'],['map-down','ArrowDown']])$(id).onclick=()=>walkMap(key);
 $('map-enter').onclick=()=>enterMap();
-function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;$('map-selected').textContent=STAGES[mapIndex].name+' — Space to enter'}}
-function showMap(){clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='THE SKYBOUND ISLES';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
+function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;renderMap()}}
+function showMap(){clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
 function retryCloudTrial(){
  if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
@@ -82,7 +83,7 @@ function deathScreen(){
  const i=level.index,cp=checkpoint;start(i);checkpoint=cp;respawn();mode='play';$('overlay').hidden=true;
  });
 }
-function win(){clearCarry(p);clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Skybound Isles are free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',showMap)}
+function win(){wonSpaceReady=!keys.has('Space')&&!entryHeld;clearCarry(p);clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=Math.max(unlocked,level.index+1);try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated and the Green Valley is free. All stages are now open for replay.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()});$('overlay-copy').textContent+=' Click to continue or press Space.'}
 function hit(){
  const result=damagePlayer(p,solidsFor(level));
  if(result!=='ignored'&&p.carry)releaseIce(p,level,{force:true,onBreak:iceBurst});
@@ -101,7 +102,7 @@ function bumpBlock(block){
 }
 function burst(x,y,color){for(let i=0;i<10;i++)particles.push({x,y,vx:(Math.random()-.5)*220,vy:-Math.random()*190,life:.6,color})}
 function iceBurst(e){burst(e.x+e.w/2,e.y+e.h/2,'#b6edff');tone(940,.1)}
-function interactIce(){const ok=p.carry?releaseIce(p,level):pickIce(p,level);$('status').textContent=ok?(p.carry?'Ice carried. E/J drops; X/K throws.':'Ice placed safely.'):'No accessible frozen rival or no room to place it.';if(ok)tone(720)}
+function interactIce(){const ok=p.carry?releaseIce(p,level):pickIce(p,level);$('status').textContent=ok?(p.carry?'Object carried. E/J drops; X/K throws.':'Object placed safely.'):'Find a frozen rival or a stationary shell, with room to carry it.';if(ok)tone(720)}
 function power(){
  if(p.dead||p.cool>0)return;
  if(p.carry){if(releaseIce(p,level,{throwing:true})){p.cool=.32;tone(530)}else $('status').textContent='No room to throw here.';return}
@@ -187,7 +188,7 @@ function draw(){
  for(const a of particles){ctx.globalAlpha=Math.max(0,a.life/.6);rect(a.x,a.y,4,4,a.color);ctx.globalAlpha=1}
  ctx.restore();
  rect(16,14,280,62,'#10283ad9');text('JARVIS',30,36,12,'#8bd7c0');text(p.state,30,61,14,'#f0dba1');text((runState.coins||0)+'/50',123,59,14,'#f7cd69');text(p.power.toUpperCase(),195,37,10,colors[p.power]);text(p.power==='cloud'?p.charges+' clouds':'X · POWER',195,58,10,'#dae8ee');
- if(p.carry){rect(280,496,400,30,'#10283add');text('ICE: E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
+ if(p.carry){rect(280,496,400,30,'#10283add');text((p.carry.carryType==='shell'?'SHELL':'ICE')+': E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
  if(lifeNotice>0)text('1-UP! EXTRA LIFE',480,100,20,'#a3f093','center');
  rect(650,14,182,62,'#10283ad9');text('LIVES '+runState.lives,662,37,14,'#f7cd69');text('TIME '+Math.ceil(remaining),662,60,14,remaining<=60?'#ff9b87':'#e5eeec');
  text(level.boss?'BOSS STAGE':'STAGE '+(level.index>8?level.index:level.index+1),930,36,12,'#fff','right');
@@ -204,8 +205,12 @@ function frame(t){
  }
  if(level&&mode!=='map')draw();requestAnimationFrame(frame);
 }
-document.addEventListener('keydown',e=>{if(mode==='map'){if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)});
-document.addEventListener('keyup',e=>{keys.delete(e.code);if(e.code==='Space')entryHeld=false});
+function onKeyDown(e){
+ if(mode==='won'){if(e.code==='Space'){e.preventDefault();if(!e.repeat&&wonSpaceReady){wonSpaceReady=false;mapSpaceBlocked=true;$('continue').onclick()}}return}
+ if(mode==='map'){if(e.code==='Space'&&mapSpaceBlocked){e.preventDefault();return}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)}
+document.addEventListener('keydown',onKeyDown);
+function onKeyUp(e){keys.delete(e.code);if(e.code==='Space'){entryHeld=false;wonSpaceReady=true;mapSpaceBlocked=false}}
+document.addEventListener('keyup',onKeyUp);
 window.addEventListener('blur',()=>{entryHeld=false;keys.clear();pressed.clear();if(mode==='play')pause()});
 document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='play')pause()});
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);canvas.focus();keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
