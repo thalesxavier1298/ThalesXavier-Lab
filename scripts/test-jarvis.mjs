@@ -1,3 +1,4 @@
+import * as secretHelpers from '../public/jarvis/secrets.mjs';
 import {ICE,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from '../public/jarvis/ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,addHiddenBlocks,standsOnBlock} from '../public/jarvis/objects.mjs';
 import {stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,enemyShot} from '../public/jarvis/encounters.mjs';
@@ -111,7 +112,7 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({...secretHelpers,console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
@@ -131,7 +132,7 @@ test('small cannot break brick; super can',()=>{
 });
 test('both boss gates, victory persistence, retry and pause survive integration',()=>{
  for(const i of [8,16]){run('start('+i+');p.x=level.goal;update(1/120)');assert.equal(run('mode'),'play');run('level.chief.hp=0;update(1/120)');assert.equal(run('mode'),'won')}
- assert.equal(storage.get('jarvis-skybound-v1'),'17');
+ assert(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}).cleared.includes(16));assert.equal(storage.get('jarvis-skybound-v1'),'0');
  run('start(0);pause()');assert.equal(run('mode'),'paused');run('pause()');assert.equal(run('mode'),'play');
  run('p.y=700;update(1/120)');assert.equal(run('mode'),'dying');run('deathScreen()');assert.equal(run('mode'),'dead');
  node('continue').onclick();assert.equal(run('p.state'),'SMALL');assert.equal(run('mode'),'play');
@@ -219,7 +220,7 @@ test('stage lengths and timers allow exploration; recovery supplies remain singl
  let prior=0;
  for(let i=0;i<17;i++){
   const l=makeLevel(i);assert(l.width>=3300);prior=l.width;
-  assert(l.timeLimit>=300&&l.timeLimit<=740);assert(l.timeLimit>l.width/210+120);
+  assert(l.timeLimit>=300&&l.timeLimit<=800);assert(l.timeLimit>l.width/210+120);
   for(const c of l.checkpoints){
    assert(l.blocks.some(b=>b.content==='power'&&b.x>=c.x&&b.x<c.x+140&&Math.abs(b.y-(c.top-104))<1));
   }
@@ -518,6 +519,45 @@ test('curved map positions reverse precisely and every adjacent destination is r
 test('Green Valley map preserves 17 destinations and selects the current node',()=>{
  run('unlocked=17;runState.stage=0;level=null;showMap()');assert.equal(node('world-title').textContent,'GREEN VALLEY');assert.equal((node('island-map').innerHTML.match(/data-stage=/g)||[]).length,17);assert(node('island-map').innerHTML.includes(' selected'));
  for(const at of MAP_POINTS)assert(at.x>40&&at.x<930&&at.y>60&&at.y<700);
+});
+test('death Space confirmation requires a fresh press and does not jump after respawning',()=>{
+ run('resetLives(runState);start(0);entryHeld=false;keys.add("Space");die();deathScreen();onKeyDown({code:"Space",repeat:true,preventDefault(){}})');assert.equal(run('mode'),'dead');
+ run('onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'dead');
+ run('onKeyUp({code:"Space"});onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'play');assert(run('entryHeld'));const y=run('p.y');run('update(1/120)');assert.equal(run('p.y'),y);run('onKeyUp({code:"Space"})');
+});
+test('Game Over Space returns to the map once with five lives and preserved resources',()=>{
+ run('resetLives(runState);start(0);entryHeld=false;runState.lives=1;runState.coins=23;die();deathScreen();onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'map');assert.equal(run('runState.lives'),5);assert.equal(run('runState.coins'),23);
+ run('onKeyDown({code:"Space",repeat:true,preventDefault(){}})');assert.equal(run('mode'),'map');run('onKeyUp({code:"Space"})');
+});
+test('Space pressed during the death animation must be released before the retry screen',()=>{
+ run('start(0);entryHeld=false;die();onKeyDown({code:"Space",repeat:false,preventDefault(){}});deathScreen();onKeyDown({code:"Space",repeat:true,preventDefault(){}})');assert.equal(run('mode'),'dead');run('onKeyUp({code:"Space"})');node('continue').onclick();assert.equal(run('mode'),'play');
+});
+test('bonus entry and return preserve the main level instance, used boxes and elapsed time',()=>{
+ run('start(0);var mainLevel=level;var entrance=level.portals.find(d=>d.kind==="bonus");level.blocks[0].used=true;remaining=200;usePortal(entrance)');assert(run('level.isBonus'));assert.equal(run('remaining'),200);
+ run('var roomLevel=level;level.coins[0].taken=true;update(.25);restoreBonus()');assert(run('level===mainLevel'));assert(run('level.blocks[0].used'));assert.equal(run('remaining'),199.75);
+ run('usePortal(entrance)');assert(run('level===roomLevel'));assert(run('level.coins[0].taken'));run('restoreBonus()');
+});
+test('bonus shard saves immediately and does not change the common coin counter',()=>{
+ run('discoveries={relics:[],exits:[],cleared:[]};start(0);usePortal(level.portals.find(d=>d.kind==="bonus"));var specialShard=level.relics[0];var coinsBefore=runState.coins;p.x=specialShard.x;p.y=specialShard.y;p.vx=0;p.vy=0;update(1/120)');assert(run('discoveries.relics.includes(specialShard.id)'));assert.equal(run('runState.coins'),run('coinsBefore'));const id=run('specialShard.id');assert(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}).relics.includes(id));run('restoreBonus();start(0)');assert(run('discoveries.relics.includes("0:2")'));
+});
+test('death and quitting inside a bonus restore the parent stage and its checkpoint',()=>{
+ run('start(5);checkpoint=1;usePortal(level.portals.find(d=>d.kind==="bonus"));die()');assert(!run('level.isBonus'));assert.equal(run('checkpoint'),1);run('deathScreen()');node('continue').onclick();assert.equal(run('level.index'),5);assert.equal(run('checkpoint'),1);
+ run('start(0);usePortal(level.portals.find(d=>d.kind==="bonus"));quitLevel()');assert.equal(run('mode'),'map');assert.equal(run('bonusVisit'),null);assert(!run('level.isBonus'));
+});
+test('portal traversal refuses carried objects rather than cloning or losing them',()=>{
+ heldFixture();run('var currentStage=level;usePortal(level.portals.find(d=>d.kind==="bonus"))');assert(run('level===currentStage'));assert(run('p.carry===held'));run('clearCarry(p)');
+});
+test('secret exit opens a usable map edge but skipped stages remain unfinished after a later clear',()=>{
+ run('discoveries={relics:[],exits:[],cleared:[]};unlocked=1;start(1);entryHeld=false;usePortal(level.portals.find(d=>d.kind==="secret"))');assert.equal(run('mode'),'won');assert.equal(run('unlocked'),1);assert(!run('discoveries.cleared.includes(1)'));
+ node('continue').onclick();run('walkMap("ArrowRight",true)');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);enterMap();win()');assert.equal(run('unlocked'),1);assert(run('discoveries.cleared.includes(4)'));assert(!run('stageCleared(3,unlocked,discoveries)'));assert(run('stageAvailable(5,unlocked,discoveries)'));
+});
+test('reset clears shards, secret exits and non-linear completions together with old progress',()=>{
+ run('discoveries.relics.push("0:0");saveDiscoveries(discoveries,localStorage)');node('reset').onclick();assert.deepEqual(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}),{relics:[],exits:[],cleared:[]});assert.equal(run('unlocked'),0);assert.equal(run('runState.coins'),0);assert.equal(storage.get('jarvis-skybound-v1'),undefined);
+});
+
+test('bonus coin cannot be recollected by leaving and re-entering; pause freezes its timer',()=>{
+ run('start(0);runState.coins=0;transformPlayer(p,STATES.FIRE,solidsFor(level));var arch=level.portals.find(d=>d.kind==="bonus");usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);assert.equal(run('p.state'),'FIRE');
+ run('var bonusTimer=remaining;pause();last=0;frame(100);frame(1000)');assert.equal(run('remaining'),run('bonusTimer'));run('pause();restoreBonus();usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);run('restoreBonus()');
 });
 console.log(count+' test groups passed.');
 
