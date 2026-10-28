@@ -1,3 +1,4 @@
+import {makeSecretTrial,stepSecretTrial,drawSecretTrial} from './secret-trials.mjs';
 import {DISCOVERY_KEY,SECRET_ROUTES,BONUS_STAGES,readDiscoveries,saveDiscoveries,collectRelic,discoverExit,stageAvailable,stageCleared,clearedCount,finishStage,relicCount,makeBonus,portalAt,drawSecrets} from './secrets.mjs';
 import {pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from './ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed} from './objects.mjs';
@@ -38,19 +39,19 @@ function renderMap(){
  return '<g class="stage '+(locked?'locked':'')+(i===mapIndex?' selected':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><circle class="selection-ring" cx="'+x+'" cy="'+y+'" r="34" fill="none" stroke="#ffe8a2" stroke-width="3"/><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="#fff7dc" stroke="#203e37" stroke-width="4" paint-order="stroke" style="font-size:11px">'+s.name+'</text>'+'<text x="'+x+'" y="'+(y+62)+'" text-anchor="middle" fill="#ffe3a3" stroke="#203e37" stroke-width="3" paint-order="stroke" style="font-size:10px">'+relicCount(discoveries,i)+'/3 shards</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'<g id="map-jarvis" aria-hidden="true" transform="translate('+coords[mapIndex].x+' '+(coords[mapIndex].y-18)+')">'+MAP_JARVIS+'</g></svg>';
  const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,coords[mapIndex].x*mapBox.scrollWidth/960-mapBox.clientWidth/2);
- const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!secretRoute;if(secretRoute)$('secret-map').textContent='Secret path → '+STAGES[secretRoute.from===mapIndex?secretRoute.to:secretRoute.from].name;
- $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(secretRoute?' · Shift + Right/Left: secret path':'');
+ const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!discoveries.exits.length;$('secret-map').textContent=secretRoute?'Use secret path (S)':'Discovered shortcuts (S)';renderShortcuts();
+ $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(discoveries.exits.length?' · S: shortcuts · click a purple trail':'');
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(stageAvailable(i,unlocked,discoveries))start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();entryHeld=e.key===' ';go()}}});
 }
 function walkMap(key,secret=false){if(mode!=='map'||mapTravel)return;const edge=secret&&SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex&&key==='ArrowRight'||r.to===mapIndex&&key==='ArrowLeft'));const next=edge?(edge.from===mapIndex?edge.to:edge.from):mapNeighbor(mapIndex,key,unlocked,i=>stageAvailable(i,unlocked,discoveries));if(next!==mapIndex)mapTravel={from:mapIndex,to:next,t:0}}
 function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel){entryHeld=holdSpace;start(mapIndex)}}
 for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map-up','ArrowUp'],['map-down','ArrowDown']])$(id).onclick=()=>walkMap(key);
 $('map-enter').onclick=()=>enterMap();
-$('secret-map').onclick=()=>{const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));if(r)walkMap(r.from===mapIndex?'ArrowRight':'ArrowLeft',true)};
+$('secret-map').onclick=()=>{const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));if(r)takeShortcut(r.from);else $('shortcut-list').hidden=!$('shortcut-list').hidden};
 function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;renderMap()}}
 function showMap(){restoreBonus();clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,16);if(!stageAvailable(mapIndex,unlocked,discoveries))mapIndex=Math.min(unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
-function retryCloudTrial(){
+function retryCloudTrial(){if(level?.isTrial){retrySecretTrial();return}
  if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
  const trial=[...level.cloudTrials].reverse().find(t=>p.x>=t.start-24);if(!trial)return;
  checkpoint=trial.checkpoint;level=buildLevel(level.index);runState.state=STATES.SMALL;persistRun();respawn();mode='play';$('overlay').hidden=true;$('pause').textContent='Pause';canvas.focus();
@@ -113,8 +114,8 @@ function power(){
  if(p.carry){if(releaseIce(p,level,{throwing:true})){p.cool=.32;tone(530)}else $('status').textContent='No room to throw here.';return}
  if((keys.has('ArrowDown')||keys.has('KeyS'))&&smashIce(p,level,iceBurst)){p.cool=.32;return}
  if(p.cool>0||p.power==='none'||p.crouch||p.dead)return;p.cool=.32;
- if(p.power==='cloud'){if(p.charges>0){clouds.push({x:p.x-30,y:p.y+p.h+14,w:100,h:14,life:4});p.charges--;tone(660)}}
- else if(p.power==='helicopter'){if(p.boost){p.vy=-720;p.boost=false;tone(740)}}
+ if(p.power==='cloud'){if(p.charges>0){clouds.push({x:p.x-30,y:p.y+p.h+14,w:100,h:14,life:4});p.charges--;if(level.isTrial)level.trialClouds++;tone(660)}}
+ else if(p.power==='helicopter'){if(p.boost){p.vy=-720;p.boost=false;if(level.isTrial)level.trialBoosts++;tone(740)}}
  else{shots.push({x:p.x+(p.face>0?p.w:-16),y:p.y+p.h*.4,w:16,h:16,vx:p.face*(p.power==='hammer'?340:430),vy:p.power==='hammer'?-430:-80,type:p.power,life:2.4});tone(p.power==='ice'?800:400)}
 }
 function update(dt){
@@ -129,7 +130,8 @@ function update(dt){
  run:keys.has('ShiftLeft')||keys.has('ShiftRight'),
  down:keys.has('ArrowDown')||keys.has('KeyS')
  };
- if(level.cloudTrials)$('cloud-retry').hidden=!level.cloudTrials.some(t=>p.x>=t.start-24);
+ if(level.isTrial){$('cloud-retry').hidden=false;$('cloud-retry').textContent='Retry secret trial (C)'}else $('cloud-retry').textContent='Retry cloud trial';
+ if(!level.isTrial&&level.cloudTrials)$('cloud-retry').hidden=!level.cloudTrials.some(t=>p.x>=t.start-24);
  const result=stepPlayer(p,input,dt,level,clouds,bumpBlock);
  if(result.jumped)tone(520);
  for(const trial of level.cloudTrials||[])if(p.x>=trial.edge-80&&p.x<trial.edge&&p.state!==STATES.CLOUD){p.x=trial.edge-81;p.vx=0;$('status').textContent='Cloud passage: collect the Cloud flower before crossing. C retries this trial.'}
@@ -146,7 +148,7 @@ function update(dt){
  if(reached!==checkpoint){checkpoint=reached;$('status').textContent='Checkpoint reached — safe return and item boxes.';tone(900)}
  for(const h of level.hazards)if(h.state==='active'&&overlap(p,h)){hit();if(mode!=='play')return}
  for(const lava of level.lava||[])if(overlap(p,lava)){die('lava');return}
- if(p.y>620){die('fall');return}
+ if(p.y>620){if(level.isTrial){retrySecretTrial();return}die('fall');return}
  for(const c of level.coins)if(!c.taken&&overlap(p,{x:c.x-9,y:c.y-9,w:18,h:18})){c.taken=true;collectCoin();tone(1100,.04);burst(c.x,c.y,'#f7cd69')}
  stepEnemies(level,p,dt,shots);
  for(const e of level.enemies){if(!e.alive||e.iceState==='carried'||e.iceState==='thrown'||e.iceState==='frozen'&&!['plant','fireplant'].includes(e.kind)||e.thawGrace>0||['plant','fireplant'].includes(e.kind)&&!e.active&&e.frozen<=0)continue;
@@ -164,6 +166,7 @@ function update(dt){
  if(boss&&boss.hp>0&&overlap(s,boss)){s.life=0;if(bossProjectileAllowed(level.index,s.type)&&boss.cool<=0){boss.hp--;boss.cool=.4;burst(boss.x,boss.y,colors[s.type]);tone(190)}else if(!bossProjectileAllowed(level.index,s.type)){burst(s.x,s.y,'#b6e7ed');$('status').textContent='The Sentinel resists ice. Use Fire, Hammer or a stomp.'}}
  }}
  if(mode!=='play')return;
+ stepSecretTrial(level,p,shots);
  shots=shots.filter(s=>s.life>0&&s.y<650&&s.x>-100&&s.x<level.width+100);
  for(const a of particles){a.life-=dt;a.x+=a.vx*dt;a.y+=a.vy*dt;a.vy+=450*dt}particles=particles.filter(a=>a.life>0);
  if(p.x>=level.goal&&(!boss||boss.hp<=0)){win();return}
@@ -186,12 +189,12 @@ function draw(){
  for(const b of clouds){ctx.globalAlpha=Math.min(1,b.life);circle(b.x+20,b.y+8,14,'white');circle(b.x+45,b.y,20,'white');circle(b.x+70,b.y+7,14,'white');rect(b.x,b.y,100,14,'white');ctx.globalAlpha=1}
  drawMechanics(ctx,level,p,checkpoint,clock);
  for(const c of level.coins)if(!c.taken){circle(c.x,c.y,9,'#f7cf62');circle(c.x,c.y,5,'#ffe9a2')}
- drawSecrets(ctx,level,discoveries,clock);
+ drawSecrets(ctx,level,discoveries,clock);drawSecretTrial(ctx,level);
  for(const e of level.enemies)drawEnemy(ctx,e,clock);
  const boss=level.chief;
  if(boss&&boss.hp>0){if(level.index===16&&boss.state==='warn'){const t=boss.arena[boss.target];rect(t.x-6,t.y+boss.h-6,84,6,'#ffc778');text('LANDING',t.x+36,t.y-10,11,'#ffdc8a','center')}rect(boss.x,boss.y,boss.w,boss.h,boss.cool>0?'#f6cb72':'#40375c');rect(boss.x-10,boss.y+12,92,20,'#77618c');for(let i=0;i<3;i++)rect(boss.x+10+i*22,boss.y-12,12,18,'#f7cd69');rect(boss.x+12,boss.y+30,12,8,'#fcba72');rect(boss.x+48,boss.y+30,12,8,'#fcba72');rect(boss.x,boss.y-30,72,5,'#221b36');rect(boss.x,boss.y-30,72*boss.hp/boss.max,5,'#f7cd69');if(level.index===16)text('PHASE '+boss.phase+' · '+boss.state.toUpperCase(),boss.x+36,boss.y-60,10,boss.state==='recover'?'#a8edb4':'#ffe2a3','center');text(level.index===16?'STORM KING':'THE SENTINEL',boss.x+36,boss.y-44,12,'#fff','center')}
  for(const s of shots){ctx.save();ctx.translate(s.x+8,s.y+8);if(s.type==='hammer'||s.style==='hammer'){ctx.rotate(clock*14);rect(-3,-8,6,24,'#dbad74');rect(-12,-10,24,12,s.owner==='enemy'?'#f4b98d':colors.hammer)}else circle(0,0,8,s.type==='enemy'?'#ef8580':colors[s.type]);ctx.restore()}
- if(!level.isBonus){const goal=level.goal;rect(goal,level.goalY-170,6,170,'#ece6bd');rect(goal+6,level.goalY-170,48,30,boss&&boss.hp>0?'#a47e8b':'#f7cd69');circle(goal+3,level.goalY-175,9,'#fff2ae');text(boss&&boss.hp>0?'DEFEAT THE GUARDIAN':'FINISH',goal,level.goalY-188,12,'#fff','center');
+ if(!level.isBonus&&!level.isTrial){const goal=level.goal;rect(goal,level.goalY-170,6,170,'#ece6bd');rect(goal+6,level.goalY-170,48,30,boss&&boss.hp>0?'#a47e8b':'#f7cd69');circle(goal+3,level.goalY-175,9,'#fff2ae');text(boss&&boss.hp>0?'DEFEAT THE GUARDIAN':'FINISH',goal,level.goalY-188,12,'#fff','center');
  }
  drawSprite(ctx,p,clock);
  for(const a of particles){ctx.globalAlpha=Math.max(0,a.life/.6);rect(a.x,a.y,4,4,a.color);ctx.globalAlpha=1}
@@ -199,6 +202,7 @@ function draw(){
  rect(16,14,280,62,'#10283ad9');text('JARVIS',30,36,12,'#8bd7c0');text(p.state,30,61,14,'#f0dba1');text((runState.coins||0)+'/50',123,59,14,'#f7cd69');text(p.power.toUpperCase(),195,37,10,colors[p.power]);text(p.power==='cloud'?p.charges+' clouds':'X · POWER',195,58,10,'#dae8ee');
  if(p.carry){rect(280,496,400,30,'#10283add');text((p.carry.carryType==='shell'?'SHELL':'ICE')+': E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
  rect(312,14,145,35,'#10283add');text([0,1,2].map(i=>discoveries.relics.includes(level.index+':'+i)?'◆':'◇').join(' '),384,38,19,'#f9d985','center');
+ if(level.isTrial){rect(310,82,340,28,'#132c40');text(level.trialSolved?'GATE OPEN — REACH THE FAR ARCH':'OPTIONAL TRIAL · C RETRIES · BLUE ARCH RETURNS',480,101,11,'#f8df9f','center')}
  if(lifeNotice>0)text('1-UP! EXTRA LIFE',480,100,20,'#a3f093','center');
  rect(650,14,182,62,'#10283ad9');text('LIVES '+runState.lives,662,37,14,'#f7cd69');text('TIME '+Math.ceil(remaining),662,60,14,remaining<=60?'#ff9b87':'#e5eeec');
  text(level.boss?'BOSS STAGE':'STAGE '+(level.index>8?level.index:level.index+1),930,36,12,'#fff','right');
@@ -218,7 +222,7 @@ function frame(t){
 function onKeyDown(e){
  if(['won','dead','gameover'].includes(mode)){if(e.code==='Space'){e.preventDefault();if(!e.repeat&&wonSpaceReady){wonSpaceReady=false;mapSpaceBlocked=true;$('continue').onclick();if(mode==='play')entryHeld=true}}return}
  if(mode==='dying'){if(e.code==='Space'){e.preventDefault();wonSpaceReady=false;keys.add('Space')}return}
- if(mode==='map'){if(e.code==='Space'&&mapSpaceBlocked){e.preventDefault();return}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code,e.shiftKey)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)}
+ if(mode==='map'){if(e.code==='Space'&&e.target?.matches?.('[data-shortcut],#secret-map'))return;if(e.code==='KeyS'){e.preventDefault();if(!e.repeat)$('secret-map').onclick();return}if(e.code==='Space'&&mapSpaceBlocked){e.preventDefault();return}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code,e.shiftKey)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)}
 document.addEventListener('keydown',onKeyDown);
 function onKeyUp(e){keys.delete(e.code);if(e.code==='Space'){entryHeld=false;wonSpaceReady=true;mapSpaceBlocked=false}}
 document.addEventListener('keyup',onKeyUp);
@@ -227,7 +231,7 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='pl
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);canvas.focus();keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
 showMap();requestAnimationFrame(frame);
 
-function secretPathsSvg(){return SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>{const a=MAP_POINTS[r.from],b=MAP_POINTS[r.to];return '<path aria-hidden="true" d="M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-70)+' '+b.x+' '+b.y+'" fill="none" stroke="#e3a8df" stroke-width="4" stroke-dasharray="5 8" pointer-events="none"/>'}).join('')}
+function secretPathsSvg(){return SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>{const a=MAP_POINTS[r.from],b=MAP_POINTS[r.to];return '<path role="button" tabindex="0" aria-label="Shortcut to '+STAGES[r.to].name+'" data-route="'+r.from+'" d="M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-70)+' '+b.x+' '+b.y+'" fill="none" stroke="#e3a8df" stroke-width="4" stroke-dasharray="5 8" pointer-events="stroke" style="cursor:pointer"/>'}).join('')}
 function restoreBonus(){
  if(!bonusVisit)return;const saved=bonusVisit;bonusVisit=null;level=saved.level;checkpoint=saved.checkpoint;shots=saved.shots;clouds=saved.clouds;items=saved.items;particles=saved.particles;
  p.x=saved.x;p.y=saved.top-p.h;p.vx=0;p.vy=0;p.ground=true;camera=saved.camera;
@@ -235,7 +239,9 @@ function restoreBonus(){
 }
 function usePortal(portal){
  if(p.carry){$('status').textContent='Place your carried object before using this arch.';return false}
+ if(portal.kind==='trial-finish'){if(!level.trialSolved){$('status').textContent='Finish the power challenge to open this exit.';return false}const original=level.sourcePortal;restoreBonus();original.trialCleared=true;return usePortal(original)}
  if(portal.kind==='return'){restoreBonus();entryHeld=true;$('status').textContent='Back on the trail. Your timer and discoveries are preserved.';return true}
+ if(['bonus','secret'].includes(portal.kind)&&!portal.trialCleared)return enterSecretTrial(portal);
  if(portal.kind==='secret'){
   discoverExit(discoveries,level.index);persistDiscoveries();runState.state=p.state;persistRun();wonSpaceReady=!keys.has('Space');mode='won';
   modal('Secret path discovered!',STAGES[portal.to].name+' is now reachable by the purple trail. Skipped stages remain unfinished. Click to continue or press Space.','Return to world map',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()});return true;
@@ -245,3 +251,16 @@ function usePortal(portal){
  level=level.bonusRoom;shots=[];clouds=[];items=[];particles=[];p.x=150;p.y=470-p.h;p.vx=0;p.vy=0;p.ground=true;camera=0;keys.clear();pressed.clear();
  $('world-title').textContent='BONUS · STARLIGHT GROTTO';$('status').textContent='Explore the grotto. Up at the blue arch returns to the trail. Timer keeps running.';return true;
 }
+
+function renderShortcuts(){
+ $('shortcut-list').innerHTML=SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>'<button data-shortcut="'+r.from+'">'+STAGES[r.from].name+' ↔ '+STAGES[r.to].name+'</button>').join('');
+ document.querySelectorAll('[data-shortcut]').forEach(el=>{el.onclick=()=>takeShortcut(Number(el.dataset.shortcut))});
+ document.querySelectorAll('[data-route]').forEach(el=>{const go=()=>takeShortcut(Number(el.dataset.route));el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();go()}}});
+}
+function takeShortcut(from){if(mode!=='map'||mapTravel||!discoveries.exits.includes(from))return false;const r=SECRET_ROUTES.find(r=>r.from===from);if(!r)return false;const target=mapIndex===r.to?r.from:r.to;if(mapIndex!==r.from&&mapIndex!==r.to){mapIndex=r.from;renderMap()}mapTravel={from:mapIndex,to:target,t:0};$('shortcut-list').hidden=true;return true}
+function enterSecretTrial(portal){
+ portal.trialRoom??=makeSecretTrial(level,portal);bonusVisit={level,checkpoint,shots,clouds,items,particles,x:portal.returnX??portal.x,top:portal.top,camera};
+ level=portal.trialRoom;shots=[];clouds=[];items=[];particles=[];p.x=70;p.y=470-p.h;p.vx=0;p.vy=0;p.ground=true;camera=0;keys.clear();pressed.clear();
+ $('world-title').textContent=level.name.toUpperCase();$('status').textContent='Optional trial: use '+level.power.toUpperCase()+'. C retries; blue arch returns. Timer keeps running.';return true;
+}
+function retrySecretTrial(){if(!level?.isTrial)return;const portal=level.sourcePortal;restoreBonus();portal.trialRoom=null;transformPlayer(p,STATES.SMALL,solidsFor(level),{animate:false});clearCarry(p);enterSecretTrial(portal);$('status').textContent='Trial reset without losing a life. Collect the two supplies again.'}

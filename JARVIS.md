@@ -1,3 +1,3 @@
 # Jarvis Adventure
 
-Versão atual: Checkpoint 11 — Hidden Trails. Green Valley mantém 15 fases regulares, torre e castelo. Há 51 fragmentos, três salas bônus e três saídas secretas. Cima/W ou EXPLORE usa arcos; Secret path ou Shift+setas percorre atalhos. Espaço confirma morte, Game Over e conclusão. Consulte CHECKPOINT11.md para regras, fases indicadas, validação e instalação. O jogo continua em /jarvis/ no portfólio.
+Versão atual: 11.1 — Secret Challenges. Consulte CHECKPOINT11-1.md. S abre/usa atalhos; linhas roxas são clicáveis. Arcos BONUS/SECRET levam a desafios opcionais com poderes. C reinicia o desafio sem perder vida; o arco azul retorna. Preserva os 51 fragmentos e saídas já salvas. O jogo continua em /jarvis/.

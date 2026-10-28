@@ -1,3 +1,4 @@
+import * as trialHelpers from '../public/jarvis/secret-trials.mjs';
 import * as secretHelpers from '../public/jarvis/secrets.mjs';
 import {ICE,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from '../public/jarvis/ice.mjs';
 import {revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,addHiddenBlocks,standsOnBlock} from '../public/jarvis/objects.mjs';
@@ -112,7 +113,7 @@ test('all sprite masks and animation poses stay valid',()=>{
 });
 const nodes=new Map();const node=id=>nodes.get(id)||nodes.set(id,{hidden:false,textContent:'',innerHTML:'',focus(){},setAttribute(){},classList:{add(){},remove(){}}}).get(id);
 node('game').getContext=()=>new Proxy({measureText:t=>({width:t.length*6}),createLinearGradient:()=>({addColorStop(){}})},{get:(o,k)=>o[k]||(()=>{})});
-const storage=new Map(),context=vm.createContext({...secretHelpers,console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
+const storage=new Map(),context=vm.createContext({...trialHelpers,...secretHelpers,console,Math,Number,Set,Map,MAP_POINTS,mapNeighbor,mapPosition,MAP_JARVIS,landmarkSvg,mapRoute,mapLandscape,STAGES,makeLevel,overlap,readProgress,PHYSICS:C,INITIAL_LIVES,readRun,saveRun,loseLife,resetLives,tickTimer,addCoins,claimLife,clearLifeClaim,revealBlock,impactBlock,canBreakBlock,bossProjectileAllowed,freezeEnemy,stepFrozen,pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown,stepEnemies,strikeEnemy,stepFinalBoss,drawEnemy,STATES,createPlayer,stepPlayer,damagePlayer,transformPlayer,createItem,activateBlock,stepItems,drawSprite,drawItem,background,terrain,drawBlocks,drawMechanics,stepWorld,checkpointReached,resetWorld,solidsFor,localStorage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},document:{getElementById:node,querySelectorAll:()=>[],addEventListener(){}},window:{addEventListener(){}},requestAnimationFrame(){},confirm:()=>true});
 vm.runInContext(fs.readFileSync(new URL('../public/jarvis/game.mjs',import.meta.url),'utf8').replace(/^import[^\r\n]*[\r\n]+/gm,''),context);
 const run=code=>vm.runInContext(code,context);
 prepare=()=>run('resetLives(runState);runState.coins=0;runState.lifeClaims=[]');
@@ -533,22 +534,22 @@ test('Space pressed during the death animation must be released before the retry
  run('start(0);entryHeld=false;die();onKeyDown({code:"Space",repeat:false,preventDefault(){}});deathScreen();onKeyDown({code:"Space",repeat:true,preventDefault(){}})');assert.equal(run('mode'),'dead');run('onKeyUp({code:"Space"})');node('continue').onclick();assert.equal(run('mode'),'play');
 });
 test('bonus entry and return preserve the main level instance, used boxes and elapsed time',()=>{
- run('start(0);var mainLevel=level;var entrance=level.portals.find(d=>d.kind==="bonus");level.blocks[0].used=true;remaining=200;usePortal(entrance)');assert(run('level.isBonus'));assert.equal(run('remaining'),200);
+ run('start(0);var mainLevel=level;var entrance=Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true});level.blocks[0].used=true;remaining=200;usePortal(entrance)');assert(run('level.isBonus'));assert.equal(run('remaining'),200);
  run('var roomLevel=level;level.coins[0].taken=true;update(.25);restoreBonus()');assert(run('level===mainLevel'));assert(run('level.blocks[0].used'));assert.equal(run('remaining'),199.75);
  run('usePortal(entrance)');assert(run('level===roomLevel'));assert(run('level.coins[0].taken'));run('restoreBonus()');
 });
 test('bonus shard saves immediately and does not change the common coin counter',()=>{
- run('discoveries={relics:[],exits:[],cleared:[]};start(0);usePortal(level.portals.find(d=>d.kind==="bonus"));var specialShard=level.relics[0];var coinsBefore=runState.coins;p.x=specialShard.x;p.y=specialShard.y;p.vx=0;p.vy=0;update(1/120)');assert(run('discoveries.relics.includes(specialShard.id)'));assert.equal(run('runState.coins'),run('coinsBefore'));const id=run('specialShard.id');assert(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}).relics.includes(id));run('restoreBonus();start(0)');assert(run('discoveries.relics.includes("0:2")'));
+ run('discoveries={relics:[],exits:[],cleared:[]};start(0);usePortal(Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true}));var specialShard=level.relics[0];var coinsBefore=runState.coins;p.x=specialShard.x;p.y=specialShard.y;p.vx=0;p.vy=0;update(1/120)');assert(run('discoveries.relics.includes(specialShard.id)'));assert.equal(run('runState.coins'),run('coinsBefore'));const id=run('specialShard.id');assert(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}).relics.includes(id));run('restoreBonus();start(0)');assert(run('discoveries.relics.includes("0:2")'));
 });
 test('death and quitting inside a bonus restore the parent stage and its checkpoint',()=>{
- run('start(5);checkpoint=1;usePortal(level.portals.find(d=>d.kind==="bonus"));die()');assert(!run('level.isBonus'));assert.equal(run('checkpoint'),1);run('deathScreen()');node('continue').onclick();assert.equal(run('level.index'),5);assert.equal(run('checkpoint'),1);
- run('start(0);usePortal(level.portals.find(d=>d.kind==="bonus"));quitLevel()');assert.equal(run('mode'),'map');assert.equal(run('bonusVisit'),null);assert(!run('level.isBonus'));
+ run('start(5);checkpoint=1;usePortal(Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true}));die()');assert(!run('level.isBonus'));assert.equal(run('checkpoint'),1);run('deathScreen()');node('continue').onclick();assert.equal(run('level.index'),5);assert.equal(run('checkpoint'),1);
+ run('start(0);usePortal(Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true}));quitLevel()');assert.equal(run('mode'),'map');assert.equal(run('bonusVisit'),null);assert(!run('level.isBonus'));
 });
 test('portal traversal refuses carried objects rather than cloning or losing them',()=>{
- heldFixture();run('var currentStage=level;usePortal(level.portals.find(d=>d.kind==="bonus"))');assert(run('level===currentStage'));assert(run('p.carry===held'));run('clearCarry(p)');
+ heldFixture();run('var currentStage=level;usePortal(Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true}))');assert(run('level===currentStage'));assert(run('p.carry===held'));run('clearCarry(p)');
 });
 test('secret exit opens a usable map edge but skipped stages remain unfinished after a later clear',()=>{
- run('discoveries={relics:[],exits:[],cleared:[]};unlocked=1;start(1);entryHeld=false;usePortal(level.portals.find(d=>d.kind==="secret"))');assert.equal(run('mode'),'won');assert.equal(run('unlocked'),1);assert(!run('discoveries.cleared.includes(1)'));
+ run('discoveries={relics:[],exits:[],cleared:[]};unlocked=1;start(1);entryHeld=false;usePortal(Object.assign(level.portals.find(d=>d.kind==="secret"),{trialCleared:true}))');assert.equal(run('mode'),'won');assert.equal(run('unlocked'),1);assert(!run('discoveries.cleared.includes(1)'));
  node('continue').onclick();run('walkMap("ArrowRight",true)');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);enterMap();win()');assert.equal(run('unlocked'),1);assert(run('discoveries.cleared.includes(4)'));assert(!run('stageCleared(3,unlocked,discoveries)'));assert(run('stageAvailable(5,unlocked,discoveries)'));
 });
 test('reset clears shards, secret exits and non-linear completions together with old progress',()=>{
@@ -556,8 +557,47 @@ test('reset clears shards, secret exits and non-linear completions together with
 });
 
 test('bonus coin cannot be recollected by leaving and re-entering; pause freezes its timer',()=>{
- run('start(0);runState.coins=0;transformPlayer(p,STATES.FIRE,solidsFor(level));var arch=level.portals.find(d=>d.kind==="bonus");usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);assert.equal(run('p.state'),'FIRE');
+ run('start(0);runState.coins=0;transformPlayer(p,STATES.FIRE,solidsFor(level));var arch=Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true});usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);assert.equal(run('p.state'),'FIRE');
  run('var bonusTimer=remaining;pause();last=0;frame(100);frame(1000)');assert.equal(run('remaining'),run('bonusTimer'));run('pause();restoreBonus();usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);run('restoreBonus()');
+});
+test('S and a discovered route work from either endpoint or the global shortcut list',()=>{
+ run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=17;start(1);showMap();onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),1);run('stepMap(.4);mapIndex=0;renderMap();onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(node('shortcut-list').hidden,false);assert(node('shortcut-list').innerHTML.includes('data-shortcut="1"'));run('takeShortcut(1);stepMap(.4)');assert.equal(run('mapIndex'),4);assert(node('island-map').innerHTML.includes('data-route="1"'));
+});
+test('unsolved golden and purple arches enter power trials and a closed gate cannot be bypassed',()=>{
+ for(const stage of [0,1,5,10,12]){run('start('+stage+');var door=level.portals[0];door.trialCleared=false;usePortal(door)');assert(run('level.isTrial'));assert.equal(run('level.power'),makeLevel(stage).power);run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert(run('level.isTrial'));assert(!run('level.trialSolved'));run('restoreBonus()')}
+});
+test('fire trial uses real projectiles to light three targets and opens the bonus room',()=>{
+ run('discoveries={relics:[],exits:[],cleared:[]};start(0);usePortal(level.portals.find(d=>d.kind==="bonus"));transformPlayer(p,STATES.FIRE,solidsFor(level));entryHeld=false');
+ for(const x of [650,860,1100]){run('p.x='+x+';p.y=422;p.vx=0;p.vy=0;p.face=1;p.cool=0;power()');for(let n=0;n<35;n++)run('update(1/120)')}
+ assert(run('level.trialTargets.every(t=>t.lit)'));assert(run('level.gate.broken'));run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert(run('level.isBonus'));assert(run('bonusVisit'));run('restoreBonus()');
+});
+test('cloud trials are crossed with running jumps and two created cloud platforms',()=>{
+ for(const stage of [4]){run('start('+stage+');usePortal(level.portals.find(d=>d.kind==="bonus"));p.x=570;p.ground=true;p.vx=330;transformPlayer(p,STATES.CLOUD,solidsFor(level));p.y=470-p.h;p.cool=0;entryHeld=false');let used=0,spawned=false,reached=false;
+ for(let n=0;n<900;n++){const jump=run('p.ground&&p.x>=575');if(jump)spawned=false;run('keys.clear();keys.add("ShiftLeft");keys.add("ArrowRight");keys.add("Space");'+(jump?'pressed.add("Space");':''));if(!spawned&&used<2&&run('!p.ground&&p.vy>=0')){run('pressed.add("KeyX")');used++;spawned=true}run('update(1/120)');if(run('p.ground&&p.x>=1180')){reached=true;break}}
+ assert(reached,'trial stage '+stage);assert(run('level.trialSolved'),'used '+used+' '+run('JSON.stringify({trial:level.isTrial,clouds:level.trialClouds,state:p.state,x:p.x})'));run('restoreBonus()');}
+});
+test('retry rebuilds the optional trial without life or timer refill; returning preserves it',()=>{
+ run('start(10);usePortal(level.portals.find(d=>d.kind==="bonus"));var livesBefore=runState.lives;var timeBefore=remaining;level.blocks[0].used=true;retrySecretTrial()');assert.equal(run('runState.lives'),run('livesBefore'));assert.equal(run('remaining'),run('timeBefore'));assert(!run('level.blocks[0].used'));run('level.blocks[0].used=true;restoreBonus();usePortal(level.portals.find(d=>d.kind==="bonus"))');assert(run('level.blocks[0].used'));run('restoreBonus()');
+});
+test('helicopter secret trial reaches both high ledges with real boosts and opens its gate',()=>{
+ run('start(1);usePortal(level.portals.find(d=>d.kind==="secret"));transformPlayer(p,STATES.HELICOPTER,solidsFor(level));p.x=580;p.y=470-p.h;p.ground=true;p.vx=0;p.cool=0;entryHeld=false');
+ for(const target of [{x:700,top:310},{x:1000,top:180}]){
+  run('p.cool=0;power();keys.clear();keys.add("Space");keys.add("ShiftLeft")');let landed=false;
+  for(let n=0;n<240;n++){run('if(p.x<'+target.x+'){keys.add("ArrowRight")}else keys.delete("ArrowRight");update(1/120)');if(run('p.ground&&Math.abs(p.y+p.h-'+target.top+')<2')){landed=true;break}}
+  assert(landed,'ledge '+target.top);if(target.top===310){run('p.x=750;p.vx=0')}
+ }
+ assert(run('level.trialSolved'));run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert.equal(run('mode'),'won');assert(run('discoveries.exits.includes(1)'));
+});
+test('hammer bonus requires real arcing hammer hits at three different ledges',()=>{
+ run('start(5);usePortal(level.portals.find(d=>d.kind==="bonus"));transformPlayer(p,STATES.HAMMER,solidsFor(level));entryHeld=false');
+ for(const pos of [{x:620,top:390},{x:880,top:330},{x:1115,top:390}]){run('p.x='+pos.x+';p.y='+pos.top+'-p.h;p.vx=0;p.vy=0;p.face=1;p.cool=0;p.ground=true;power()');for(let n=0;n<60;n++)run('update(1/120)')}
+ assert(run('level.trialTargets.every(t=>t.lit)'));assert(run('level.trialSolved'));run('restoreBonus()');
+});
+test('ice trial requires two different frozen objects placed into sockets, not carried over them',()=>{
+ run('start(10);usePortal(level.portals.find(d=>d.kind==="bonus"));transformPlayer(p,STATES.ICE,solidsFor(level));entryHeld=false');
+ for(let i=0;i<2;i++){run('var trialFoe=level.enemies['+i+'];trialFoe.x=p.x+45;trialFoe.y=p.y+p.h-32;freezeEnemy(trialFoe);pickIce(p,level);var socket=level.receivers['+i+'];p.x=socket.x-30;p.y=socket.y+socket.h-p.h;stepCarriedAndThrown(level,p,0);stepSecretTrial(level,p,shots)');assert(!run('socket.charged'));run('releaseIce(p,level);stepSecretTrial(level,p,shots)');assert(run('socket.charged'));
+ }
+ assert(run('level.trialSolved'));run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert(run('level.isBonus'));run('restoreBonus()');
 });
 console.log(count+' test groups passed.');
 

@@ -1,7 +1,7 @@
 import {intersects,solidsFor} from './physics.mjs';
 export const DISCOVERY_KEY='jarvis-hidden-trails-v1';
 export const SECRET_ROUTES=[{from:1,to:4},{from:5,to:9},{from:12,to:15}];
-export const BONUS_STAGES=[0,5,10];
+export const BONUS_STAGES=[0,4,5,10];
 export function readDiscoveries(storage){
  try{const r=JSON.parse(storage.getItem(DISCOVERY_KEY));return {relics:[...new Set((Array.isArray(r?.relics)?r.relics:[]).filter(k=>typeof k==='string'&&/^(?:[0-9]|1[0-6]):[0-2]$/.test(k)))],exits:[...new Set((Array.isArray(r?.exits)?r.exits:[]).filter(i=>SECRET_ROUTES.some(s=>s.from===i)))],cleared:[...new Set((Array.isArray(r?.cleared)?r.cleared:[]).filter(i=>Number.isInteger(i)&&i>=0&&i<17))]}}catch{return {relics:[],exits:[],cleared:[]}}
 }
