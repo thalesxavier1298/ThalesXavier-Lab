@@ -4,7 +4,7 @@ export function mapNeighbor(index,key,unlocked,available=null){
  const d={ArrowLeft:[-1,0],ArrowRight:[1,0],ArrowUp:[0,-1],ArrowDown:[0,1]}[key];if(!d)return index;
  let best=index,score=.55;for(const n of [index-1,index+1]){if(n<0||n>16||(available?!available(n):n>Math.min(unlocked,16)))continue;const a=MAP_POINTS[index],b=MAP_POINTS[n],dx=b.x-a.x,dy=b.y-a.y,s=(dx*d[0]+dy*d[1])/Math.hypot(dx,dy);if(s>score){best=n;score=s}}return best;
 }
-export function mapPosition(from,to,t){const a=MAP_POINTS[from],b=MAP_POINTS[to],k=Math.min(1,Math.max(0,t));if(Math.abs(to-from)!==1){const c={x:(a.x+b.x)/2,y:Math.min(a.y,b.y)-70};return {x:(1-k)**2*a.x+2*(1-k)*k*c.x+k*k*b.x,y:(1-k)**2*a.y+2*(1-k)*k*c.y+k*k*b.y}};const c=control(Math.min(from,to));return {x:(1-k)**2*a.x+2*(1-k)*k*c.x+k*k*b.x,y:(1-k)**2*a.y+2*(1-k)*k*c.y+k*k*b.y}}
+export function mapPosition(from,to,t){const a=MAP_POINTS[from],b=MAP_POINTS[to],k=Math.min(1,Math.max(0,t));if(Math.abs(to-from)!==1){const c={x:(a.x+b.x)/2,y:Math.min(a.y,b.y)-120};return {x:(1-k)**2*a.x+2*(1-k)*k*c.x+k*k*b.x,y:(1-k)**2*a.y+2*(1-k)*k*c.y+k*k*b.y}};const c=control(Math.min(from,to));return {x:(1-k)**2*a.x+2*(1-k)*k*c.x+k*k*b.x,y:(1-k)**2*a.y+2*(1-k)*k*c.y+k*k*b.y}}
 export function mapRoute(){return 'M '+MAP_POINTS[0].x+' '+MAP_POINTS[0].y+MAP_POINTS.slice(1).map((b,i)=>{const c=control(i);return ' Q '+c.x+' '+c.y+' '+b.x+' '+b.y}).join('')}
 export function mapLandscape(){
  const tree=(x,y)=>`<g transform="translate(${x} ${y})"><path d="M-3 3H3V20H-3" fill="#87653f"/><path d="M0-28L-19-7H-10L-23 7H23L10-7H19Z" fill="#235e49"/><path d="M0-25L-12-8H-5L-15 3H0Z" fill="#448b59"/></g>`;

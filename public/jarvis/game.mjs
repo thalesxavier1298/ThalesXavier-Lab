@@ -17,7 +17,7 @@ let unlocked;try{unlocked=readProgress(localStorage)}catch{unlocked=0}
 let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],particles=[],camera=0,mode='map',last=0,clock=0,score=0,checkpoint=0,sound=false,audio=null,items=[],deathTimer=0,accumulator=0;
 let runState;try{runState=readRun(localStorage)}catch{runState={lives:INITIAL_LIVES,stage:0}}
 let lifeNotice=0,wonSpaceReady=false,mapSpaceBlocked=false;
-let discoveries;try{discoveries=readDiscoveries(localStorage)}catch{discoveries={relics:[],exits:[],cleared:[]}}let bonusVisit=null;
+let discoveries;try{discoveries=readDiscoveries(localStorage)}catch{discoveries={relics:[],exits:[],cleared:[]}}let bonusVisit=null;let junction=null;
 let remaining=0,deathReason='hit',mapIndex=0,mapTravel=null,entryHeld=false;
 function persistDiscoveries(){try{saveDiscoveries(discoveries,localStorage)}catch{}}
 function persistRun(){try{saveRun(runState,localStorage)}catch{}}
@@ -39,17 +39,17 @@ function renderMap(){
  return '<g class="stage '+(locked?'locked':'')+(i===mapIndex?' selected':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><circle class="selection-ring" cx="'+x+'" cy="'+y+'" r="34" fill="none" stroke="#ffe8a2" stroke-width="3"/><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="#fff7dc" stroke="#203e37" stroke-width="4" paint-order="stroke" style="font-size:11px">'+s.name+'</text>'+'<text x="'+x+'" y="'+(y+62)+'" text-anchor="middle" fill="#ffe3a3" stroke="#203e37" stroke-width="3" paint-order="stroke" style="font-size:10px">'+relicCount(discoveries,i)+'/3 shards</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'<g id="map-jarvis" aria-hidden="true" transform="translate('+coords[mapIndex].x+' '+(coords[mapIndex].y-18)+')">'+MAP_JARVIS+'</g></svg>';
  const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,coords[mapIndex].x*mapBox.scrollWidth/960-mapBox.clientWidth/2);
- const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!discoveries.exits.length;$('secret-map').textContent=secretRoute?'Use secret path (S)':'Discovered shortcuts (S)';renderShortcuts();
- $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(discoveries.exits.length?' · S: shortcuts · click a purple trail':'');
+ const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!discoveries.exits.length;$('secret-map').textContent=secretRoute?'Escolher caminho A / B (S)':'Encruzilhadas descobertas (S)';renderShortcuts();
+ $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(discoveries.exits.length?' · Placa: escolha A/B · S: encruzilhadas':'');
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(stageAvailable(i,unlocked,discoveries))start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();entryHeld=e.key===' ';go()}}});
 }
-function walkMap(key,secret=false){if(mode!=='map'||mapTravel)return;const edge=secret&&SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex&&key==='ArrowRight'||r.to===mapIndex&&key==='ArrowLeft'));const next=edge?(edge.from===mapIndex?edge.to:edge.from):mapNeighbor(mapIndex,key,unlocked,i=>stageAvailable(i,unlocked,discoveries));if(next!==mapIndex)mapTravel={from:mapIndex,to:next,t:0}}
-function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel){entryHeld=holdSpace;start(mapIndex)}}
+function walkMap(key,secret=false){if(mode!=='map'||mapTravel||junction)return;const edge=secret&&SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex&&key==='ArrowRight'||r.to===mapIndex&&key==='ArrowLeft'));if(edge){openJunction(mapIndex);return}const next=mapNeighbor(mapIndex,key,unlocked,i=>stageAvailable(i,unlocked,discoveries));if(next!==mapIndex)mapTravel={from:mapIndex,to:next,t:0}}
+function enterMap(holdSpace=false){if(mode==='map'&&!mapTravel&&!junction){entryHeld=holdSpace;start(mapIndex)}}
 for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map-up','ArrowUp'],['map-down','ArrowDown']])$(id).onclick=()=>walkMap(key);
 $('map-enter').onclick=()=>enterMap();
 $('secret-map').onclick=()=>{const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));if(r)takeShortcut(r.from);else $('shortcut-list').hidden=!$('shortcut-list').hidden};
-function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){mapIndex=mapTravel.to;mapTravel=null;renderMap()}}
-function showMap(){restoreBonus();clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,16);if(!stageAvailable(mapIndex,unlocked,discoveries))mapIndex=Math.min(unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
+function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){const arrivedBy=mapTravel.kind;mapIndex=mapTravel.to;mapTravel=null;renderMap();if(arrivedBy!=='secret')openJunction(mapIndex)}}
+function showMap(){closeJunction();restoreBonus();clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,16);if(!stageAvailable(mapIndex,unlocked,discoveries))mapIndex=Math.min(unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap();openJunction(mapIndex)}
 $('map-button').onclick=showMap;
 function retryCloudTrial(){if(level?.isTrial){retrySecretTrial();return}
  if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
@@ -59,8 +59,8 @@ function retryCloudTrial(){if(level?.isTrial){retrySecretTrial();return}
 }
 $('cloud-retry').onclick=retryCloudTrial;
 
-$('reset').onclick=()=>{if(confirm('Reset all stages, coins, lives, star shards and secret paths on this device?')){unlocked=0;discoveries={relics:[],exits:[],cleared:[]};persistDiscoveries();runState.coins=0;runState.lifeClaims=[];mapIndex=0;mapTravel=null;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){bonusVisit=null;clearCarry(p);level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+$('reset').onclick=()=>{if(confirm('Reset all stages, coins, lives, star shards and secret paths on this device?')){closeJunction();unlocked=0;discoveries={relics:[],exits:[],cleared:[]};persistDiscoveries();runState.coins=0;runState.lifeClaims=[];mapIndex=0;mapTravel=null;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
+function start(i){closeJunction();bonusVisit=null;clearCarry(p);level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
 function respawn(state=STATES.SMALL){clearCarry(p);
  const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;transformPlayer(p,state,solidsFor(level),{animate:false});p.inv=PHYSICS.invincibility;
  shots=[];clouds=[];particles=[];items=fresh.items;remaining=level.timeLimit;
@@ -220,6 +220,16 @@ function frame(t){
  if(level&&mode!=='map')draw();requestAnimationFrame(frame);
 }
 function onKeyDown(e){
+ if(junction){
+  if(['KeyA','KeyB','Digit1','Digit2','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space','Escape','Tab'].includes(e.code)){e.preventDefault();if(e.repeat||e.code==='Space'&&mapSpaceBlocked)return;
+   if(e.code==='Escape'){closeJunction();$('map-enter').focus();return}
+   if(e.code==='KeyA'||e.code==='Digit1'){chooseJunction('secret');return}
+   if(e.code==='KeyB'||e.code==='Digit2'){chooseJunction('normal');return}
+   if(e.code==='Enter'||e.code==='Space'){chooseJunction(junction.selection,e.code==='Space');return}
+   if(e.code==='Tab'){const choices=['secret','normal','cancel'];junction.selection=choices[(choices.indexOf(junction.selection)+(e.shiftKey?2:1))%3]}else junction.selection=(e.code==='ArrowLeft'||e.code==='ArrowUp')?'secret':'normal';$(junction.selection==='secret'?'junction-a':junction.selection==='normal'?'junction-b':'junction-close').focus();paintJunction();
+  }return;
+ }
+
  if(['won','dead','gameover'].includes(mode)){if(e.code==='Space'){e.preventDefault();if(!e.repeat&&wonSpaceReady){wonSpaceReady=false;mapSpaceBlocked=true;$('continue').onclick();if(mode==='play')entryHeld=true}}return}
  if(mode==='dying'){if(e.code==='Space'){e.preventDefault();wonSpaceReady=false;keys.add('Space')}return}
  if(mode==='map'){if(e.code==='Space'&&e.target?.matches?.('[data-shortcut],#secret-map'))return;if(e.code==='KeyS'){e.preventDefault();if(!e.repeat)$('secret-map').onclick();return}if(e.code==='Space'&&mapSpaceBlocked){e.preventDefault();return}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code,e.shiftKey)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)}
@@ -231,7 +241,12 @@ document.addEventListener('visibilitychange',()=>{if(document.hidden&&mode==='pl
 document.querySelectorAll('[data-key]').forEach(b=>{b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);canvas.focus();keys.add(b.dataset.key);pressed.add(b.dataset.key);b.classList.add('active')};const up=()=>{keys.delete(b.dataset.key);b.classList.remove('active')};b.onpointerup=up;b.onpointercancel=up;b.onlostpointercapture=up});
 showMap();requestAnimationFrame(frame);
 
-function secretPathsSvg(){return SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>{const a=MAP_POINTS[r.from],b=MAP_POINTS[r.to];return '<path role="button" tabindex="0" aria-label="Shortcut to '+STAGES[r.to].name+'" data-route="'+r.from+'" d="M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-70)+' '+b.x+' '+b.y+'" fill="none" stroke="#e3a8df" stroke-width="4" stroke-dasharray="5 8" pointer-events="stroke" style="cursor:pointer"/>'}).join('')}
+function secretPathsSvg(){return SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>{
+ const a=MAP_POINTS[r.from],b=MAP_POINTS[r.to],d='M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-120)+' '+b.x+' '+b.y;
+ const road='<g role="button" tabindex="0" aria-label="Encruzilhada: '+STAGES[r.from].name+' e '+STAGES[r.to].name+'" data-route="'+r.from+'" style="cursor:pointer"><path d="'+d+'" fill="none" stroke="#5f5139" stroke-width="18" stroke-linecap="round"/><path d="'+d+'" fill="none" stroke="#b8905f" stroke-width="12" stroke-linecap="round"/><path d="'+d+'" fill="none" stroke="#dfc18b" stroke-width="3" stroke-linecap="round"/></g>';
+ const signs=[r.from,r.to].map(i=>{const p=MAP_POINTS[i],x=Math.min(900,p.x+42),y=p.y-35;return '<g data-junction="'+i+'" role="button" tabindex="0" aria-label="Escolher caminho em '+STAGES[i].name+'" transform="translate('+x+' '+y+')" style="cursor:pointer"><path d="M-3 0H3V30H-3" fill="#775036"/><path d="M-23-9H15L25 0L15 9H-23Z" fill="'+(i===mapIndex?'#edc178':'#ba8956')+'" stroke="#4f4532" stroke-width="2"/><text x="0" y="4" text-anchor="middle" font-size="10" font-family="monospace" fill="#253b37">A / B</text></g>'}).join('');return road+signs;
+ }).join('')}
+
 function restoreBonus(){
  if(!bonusVisit)return;const saved=bonusVisit;bonusVisit=null;level=saved.level;checkpoint=saved.checkpoint;shots=saved.shots;clouds=saved.clouds;items=saved.items;particles=saved.particles;
  p.x=saved.x;p.y=saved.top-p.h;p.vx=0;p.vy=0;p.ground=true;camera=saved.camera;
@@ -255,12 +270,37 @@ function usePortal(portal){
 function renderShortcuts(){
  $('shortcut-list').innerHTML=SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>'<button data-shortcut="'+r.from+'">'+STAGES[r.from].name+' ↔ '+STAGES[r.to].name+'</button>').join('');
  document.querySelectorAll('[data-shortcut]').forEach(el=>{el.onclick=()=>takeShortcut(Number(el.dataset.shortcut))});
+ document.querySelectorAll('[data-junction]').forEach(el=>{const go=()=>openJunction(Number(el.dataset.junction));el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();go()}}});
  document.querySelectorAll('[data-route]').forEach(el=>{const go=()=>takeShortcut(Number(el.dataset.route));el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();go()}}});
 }
-function takeShortcut(from){if(mode!=='map'||mapTravel||!discoveries.exits.includes(from))return false;const r=SECRET_ROUTES.find(r=>r.from===from);if(!r)return false;const target=mapIndex===r.to?r.from:r.to;if(mapIndex!==r.from&&mapIndex!==r.to){mapIndex=r.from;renderMap()}mapTravel={from:mapIndex,to:target,t:0};$('shortcut-list').hidden=true;return true}
+function travelSecret(from){if(mode!=='map'||mapTravel||!discoveries.exits.includes(from))return false;const r=SECRET_ROUTES.find(r=>r.from===from);if(!r)return false;const target=mapIndex===r.to?r.from:r.to;if(mapIndex!==r.from&&mapIndex!==r.to){mapIndex=r.from;renderMap()}mapTravel={from:mapIndex,to:target,t:0,kind:'secret'};$('shortcut-list').hidden=true;return true}
 function enterSecretTrial(portal){
  portal.trialRoom??=makeSecretTrial(level,portal);bonusVisit={level,checkpoint,shots,clouds,items,particles,x:portal.returnX??portal.x,top:portal.top,camera};
  level=portal.trialRoom;shots=[];clouds=[];items=[];particles=[];p.x=70;p.y=470-p.h;p.vx=0;p.vy=0;p.ground=true;camera=0;keys.clear();pressed.clear();
  $('world-title').textContent=level.name.toUpperCase();$('status').textContent='Optional trial: use '+level.power.toUpperCase()+'. C retries; blue arch returns. Timer keeps running.';return true;
 }
 function retrySecretTrial(){if(!level?.isTrial)return;const portal=level.sourcePortal;restoreBonus();portal.trialRoom=null;transformPlayer(p,STATES.SMALL,solidsFor(level),{animate:false});clearCarry(p);enterSecretTrial(portal);$('status').textContent='Trial reset without losing a life. Collect the two supplies again.'}
+
+function takeShortcut(from){const r=SECRET_ROUTES.find(r=>r.from===from&&discoveries.exits.includes(from));if(!r||mapTravel||mode!=='map')return false;return openJunction(mapIndex===r.to?r.to:r.from)}
+function openJunction(index,normalTarget=null){
+ if(mode!=='map'||mapTravel)return false;const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===index||r.to===index));if(!r)return false;
+ mapIndex=index;renderMap();const target=index===r.from?r.to:r.from;
+ const forward=index+1,normal=normalTarget??(stageAvailable(forward,unlocked,discoveries)?forward:index);
+ junction={from:index,route:r.from,secret:target,normal,selection:'secret'};
+ $('junction-title').textContent='Encruzilhada — '+STAGES[index].name;
+ $('junction-a').textContent='A / 1 — Caminho secreto: '+STAGES[target].name;
+ $('junction-b').textContent='B / 2 — Caminho normal: '+(normal===index?'jogar esta fase':STAGES[normal].name);
+ $('junction').hidden=false;$('shortcut-list').hidden=true;paintJunction();$('junction-a').focus();return true;
+}
+function paintJunction(){if(!junction)return;for(const [id,choice] of [['junction-a','secret'],['junction-b','normal']])$(id).setAttribute('aria-pressed',String(junction.selection===choice))}
+function closeJunction(){junction=null;$('junction').hidden=true}
+function chooseJunction(choice,holdSpace=false){if(!junction||mode!=='map')return false;const j=junction;closeJunction();
+ if(choice==='secret')return travelSecret(j.route);
+ if(choice!=='normal'){$('map-enter').focus();return false;}
+ if(j.normal===mapIndex){entryHeld=holdSpace;start(mapIndex);return true}
+ if(!stageAvailable(j.normal,unlocked,discoveries))return false;
+ mapTravel={from:mapIndex,to:j.normal,t:0,kind:'normal'};return true;
+}
+$('junction-a').onclick=()=>chooseJunction('secret');$('junction-b').onclick=()=>chooseJunction('normal');
+
+$('junction-close').onclick=()=>{closeJunction();$('map-enter').focus()};

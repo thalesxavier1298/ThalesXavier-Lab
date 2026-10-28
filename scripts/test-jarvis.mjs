@@ -550,7 +550,7 @@ test('portal traversal refuses carried objects rather than cloning or losing the
 });
 test('secret exit opens a usable map edge but skipped stages remain unfinished after a later clear',()=>{
  run('discoveries={relics:[],exits:[],cleared:[]};unlocked=1;start(1);entryHeld=false;usePortal(Object.assign(level.portals.find(d=>d.kind==="secret"),{trialCleared:true}))');assert.equal(run('mode'),'won');assert.equal(run('unlocked'),1);assert(!run('discoveries.cleared.includes(1)'));
- node('continue').onclick();run('walkMap("ArrowRight",true)');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);enterMap();win()');assert.equal(run('unlocked'),1);assert(run('discoveries.cleared.includes(4)'));assert(!run('stageCleared(3,unlocked,discoveries)'));assert(run('stageAvailable(5,unlocked,discoveries)'));
+ node('continue').onclick();run('chooseJunction("secret")');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);enterMap();win()');assert.equal(run('unlocked'),1);assert(run('discoveries.cleared.includes(4)'));assert(!run('stageCleared(3,unlocked,discoveries)'));assert(run('stageAvailable(5,unlocked,discoveries)'));
 });
 test('reset clears shards, secret exits and non-linear completions together with old progress',()=>{
  run('discoveries.relics.push("0:0");saveDiscoveries(discoveries,localStorage)');node('reset').onclick();assert.deepEqual(secretHelpers.readDiscoveries({getItem:k=>storage.get(k)}),{relics:[],exits:[],cleared:[]});assert.equal(run('unlocked'),0);assert.equal(run('runState.coins'),0);assert.equal(storage.get('jarvis-skybound-v1'),undefined);
@@ -560,8 +560,10 @@ test('bonus coin cannot be recollected by leaving and re-entering; pause freezes
  run('start(0);runState.coins=0;transformPlayer(p,STATES.FIRE,solidsFor(level));var arch=Object.assign(level.portals.find(d=>d.kind==="bonus"),{trialCleared:true});usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);assert.equal(run('p.state'),'FIRE');
  run('var bonusTimer=remaining;pause();last=0;frame(100);frame(1000)');assert.equal(run('remaining'),run('bonusTimer'));run('pause();restoreBonus();usePortal(arch);p.x=level.coins[0].x;p.y=422;p.ground=true;update(1/120)');assert.equal(run('runState.coins'),1);run('restoreBonus()');
 });
-test('S and a discovered route work from either endpoint or the global shortcut list',()=>{
- run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=17;start(1);showMap();onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),4);run('stepMap(.4);onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),1);run('stepMap(.4);mapIndex=0;renderMap();onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(node('shortcut-list').hidden,false);assert(node('shortcut-list').innerHTML.includes('data-shortcut="1"'));run('takeShortcut(1);stepMap(.4)');assert.equal(run('mapIndex'),4);assert(node('island-map').innerHTML.includes('data-route="1"'));
+test('S, signs and discovered route list open an explicit crossroads choice',()=>{
+ run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=17;start(1);showMap()');assert(run('junction'));assert.equal(run('mapTravel'),null);
+ run('onKeyDown({code:"KeyA",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),4);run('stepMap(.4)');assert.equal(run('junction'),null);
+ run('onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert(run('junction'));run('chooseJunction("secret");stepMap(.4);mapIndex=0;renderMap();onKeyDown({code:"KeyS",repeat:false,preventDefault(){}})');assert.equal(node('shortcut-list').hidden,false);assert(node('shortcut-list').innerHTML.includes('data-shortcut="1"'));run('takeShortcut(1)');assert(run('junction'));run('chooseJunction("secret");stepMap(.4)');assert.equal(run('mapIndex'),4);assert(node('island-map').innerHTML.includes('data-route="1"'));
 });
 test('unsolved golden and purple arches enter power trials and a closed gate cannot be bypassed',()=>{
  for(const stage of [0,1,5,10,12]){run('start('+stage+');var door=level.portals[0];door.trialCleared=false;usePortal(door)');assert(run('level.isTrial'));assert.equal(run('level.power'),makeLevel(stage).power);run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert(run('level.isTrial'));assert(!run('level.trialSolved'));run('restoreBonus()')}
@@ -598,6 +600,26 @@ test('ice trial requires two different frozen objects placed into sockets, not c
  for(let i=0;i<2;i++){run('var trialFoe=level.enemies['+i+'];trialFoe.x=p.x+45;trialFoe.y=p.y+p.h-32;freezeEnemy(trialFoe);pickIce(p,level);var socket=level.receivers['+i+'];p.x=socket.x-30;p.y=socket.y+socket.h-p.h;stepCarriedAndThrown(level,p,0);stepSecretTrial(level,p,shots)');assert(!run('socket.charged'));run('releaseIce(p,level);stepSecretTrial(level,p,shots)');assert(run('socket.charged'));
  }
  assert(run('level.trialSolved'));run('usePortal(level.portals.find(d=>d.kind==="trial-finish"))');assert(run('level.isBonus'));run('restoreBonus()');
+});
+test('all six junction endpoints offer the correct secret destination and A travels both ways',()=>{
+ for(const r of secretHelpers.SECRET_ROUTES)for(const point of [r.from,r.to]){run('discoveries={relics:[],exits:[1,5,12],cleared:[]};unlocked=17;start('+point+');showMap()');assert.equal(run('junction.secret'),point===r.from?r.to:r.from);assert.equal(node('junction').hidden,false);run('onKeyDown({code:"KeyA",repeat:false,preventDefault(){}});stepMap(.4)');assert.equal(run('mapIndex'),point===r.from?r.to:r.from);assert.equal(run('junction'),null);assert.equal(run('mapTravel'),null)}
+});
+test('normal B follows the main trail and never marks any stage as cleared',()=>{
+ run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=2;start(1);showMap();onKeyDown({code:"KeyB",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),2);run('stepMap(.4)');assert.equal(run('mapIndex'),2);assert.equal(run('discoveries.cleared.length'),0);assert.equal(run('unlocked'),2);
+});
+test('when the normal next stage is locked, B enters the current stage without a phantom jump',()=>{
+ run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=1;start(1);showMap();onKeyDown({code:"KeyB",repeat:false,preventDefault(){}})');assert.equal(run('mode'),'play');assert.equal(run('level.index'),1);assert(!run('entryHeld'));run('pressed.add("Space");keys.add("Space");update(1/120)');assert(run('p.vy')<0);
+});
+test('arrow selection and Enter confirm B; repeating or held Space cannot choose accidentally',()=>{
+ run('unlocked=17;start(1);showMap();onKeyDown({code:"KeyA",repeat:true,preventDefault(){}})');assert(run('junction'));assert.equal(run('mapTravel'),null);
+ run('mapSpaceBlocked=true;onKeyDown({code:"Space",repeat:false,preventDefault(){}})');assert(run('junction'));run('onKeyUp({code:"Space"});onKeyDown({code:"ArrowDown",repeat:false,preventDefault(){}})');assert.equal(run('junction.selection'),'normal');run('onKeyDown({code:"Enter",repeat:false,preventDefault(){}})');assert.equal(run('mapTravel.to'),2);run('stepMap(.4)');
+});
+test('walking into a discovered endpoint opens its sign; Esc allows replaying the selected stage',()=>{
+ run('discoveries={relics:[],exits:[1],cleared:[]};unlocked=17;start(0);showMap();walkMap("ArrowRight");stepMap(.4)');assert.equal(run('junction.from'),1);run('onKeyDown({code:"Escape",repeat:false,preventDefault(){}})');assert.equal(run('junction'),null);run('enterMap()');assert.equal(run('level.index'),1);assert.equal(run('mode'),'play');
+});
+test('dialog buttons support click or touch, and hidden roads do not reveal undiscovered exits',()=>{
+ run('discoveries={relics:[],exits:[],cleared:[]};unlocked=17;start(1);showMap()');assert.equal(run('junction'),null);assert(!node('island-map').innerHTML.includes('data-junction'));
+ run('discoveries.exits=[1];openJunction(1)');node('junction-a').onclick();run('stepMap(.4);openJunction(4)');node('junction-b').onclick();assert.equal(run('mapTravel.to'),5);run('stepMap(.4)');
 });
 console.log(count+' test groups passed.');
 
