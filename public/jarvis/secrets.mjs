@@ -1,14 +1,14 @@
 import {intersects,solidsFor} from './physics.mjs';
 export const DISCOVERY_KEY='jarvis-hidden-trails-v1';
 export const SECRET_ROUTES=[{from:1,to:4},{from:5,to:9},{from:12,to:15}];
-export const BONUS_STAGES=[0,4,5,10];
+export const BONUS_STAGES=[0,1,4,5,10,12];
 export function readDiscoveries(storage){
  try{const r=JSON.parse(storage.getItem(DISCOVERY_KEY));return {relics:[...new Set((Array.isArray(r?.relics)?r.relics:[]).filter(k=>typeof k==='string'&&/^(?:[0-9]|1[0-6]):[0-2]$/.test(k)))],exits:[...new Set((Array.isArray(r?.exits)?r.exits:[]).filter(i=>SECRET_ROUTES.some(s=>s.from===i)))],cleared:[...new Set((Array.isArray(r?.cleared)?r.cleared:[]).filter(i=>Number.isInteger(i)&&i>=0&&i<17))]}}catch{return {relics:[],exits:[],cleared:[]}}
 }
 export function saveDiscoveries(data,storage){try{storage.setItem(DISCOVERY_KEY,JSON.stringify(data))}catch{}}
 export function collectRelic(data,id){if(!/^(?:[0-9]|1[0-6]):[0-2]$/.test(id)||data.relics.includes(id))return false;data.relics.push(id);return true}
 export function discoverExit(data,index){if(!SECRET_ROUTES.some(s=>s.from===index)||data.exits.includes(index))return false;data.exits.push(index);return true}
-export function stageAvailable(index,linear,data){return index>=0&&index<17&&(index<=linear||data.cleared.includes(index)||data.cleared.includes(index-1)||SECRET_ROUTES.some(s=>s.to===index&&data.exits.includes(s.from)))}
+export function stageAvailable(index,linear,data){return index>=0&&index<17&&(index<=linear||data.cleared.includes(index)||data.cleared.includes(index-1)||SECRET_ROUTES.some(s=>index<=s.to&&data.exits.includes(s.from)))}
 export function stageCleared(index,linear,data){return index<linear||data.cleared.includes(index)}
 export function clearedCount(linear,data){return Array.from({length:17},(_,i)=>i).filter(i=>stageCleared(i,linear,data)).length}
 export function finishStage(data,index,linear){if(!data.cleared.includes(index))data.cleared.push(index);while(linear<17&&data.cleared.includes(linear))linear++;return linear}
@@ -30,13 +30,15 @@ export function addSecrets(level){
   const choice=candidates[Math.min(candidates.length-1,Math.floor(candidates.length*(slot===0?.08:slot===1?.55:.9)))],{x,floor}=choice;occupied.push(x);
   const ledge=choice.low?{x:x-15,y:floor.y,w:74,h:18}:{x:x-15,y:floor.y-(slot===1?112:80),w:74,h:18};if(!choice.low)level.platforms.push(ledge);
   const relic={id:level.index+':'+slot,x:x+22,y:ledge.y-28,w:22,h:26,sourceTop:floor.y,hidden:slot===2};
-  if(slot===2&&BONUS_STAGES.includes(level.index)){
-   level.portals.push({kind:'bonus',x:x-12,y:floor.y-55,w:48,h:55,slot,returnX:Math.max(floor.x+6,x-55),top:floor.y});level.bonusRelic=relic.id;
-  }else level.relics.push(relic);
+  const hasSecret=SECRET_ROUTES.some(s=>s.from===level.index);
+  if(slot===(hasSecret?0:2)&&BONUS_STAGES.includes(level.index)){
+   level.portals.push({kind:'bonus',x:x-12,y:floor.y-55,w:48,h:55,slot,returnX:Math.max(floor.x+6,x-55),top:floor.y});
+  }
+  if(slot===2&&BONUS_STAGES.includes(level.index))level.bonusRelic=relic.id;else level.relics.push(relic);
   if(slot===2&&SECRET_ROUTES.some(s=>s.from===level.index))level.portals.push({kind:'secret',x:x+8,y:ledge.y-50,w:40,h:50,top:ledge.y,to:SECRET_ROUTES.find(s=>s.from===level.index).to});
-  level.signs.push({x:x-75,y:floor.y,label:slot===0?'A STAR SHARD ABOVE THE TRAIL':slot===1?'OPTIONAL HIGH PATH — HOLD JUMP':BONUS_STAGES.includes(level.index)?'BONUS ARCH: UP TO EXPLORE':'RUIN PASSAGE: LOOK BEHIND THE ARCH'});
+  level.signs.push({x:x-75,y:floor.y,label:slot===0?(hasSecret?'BONUS: SHARD CHALLENGE / RETURN TO THIS TRAIL':'A STAR SHARD ABOVE THE TRAIL'):slot===1?'OPTIONAL HIGH PATH — HOLD JUMP':hasSecret?'SECRET EXIT: ENDS STAGE / NO SHARD':BONUS_STAGES.includes(level.index)?'BONUS ARCH: UP TO EXPLORE':'RUIN PASSAGE: LOOK BEHIND THE ARCH'});
  }
- if(level.portals.some(p=>p.kind==='secret'))level.signs.push({x:level.portals.find(p=>p.kind==='secret').x-90,y:level.portals.find(p=>p.kind==='secret').top,label:'HIDDEN EXIT: UP TO REVEAL A MAP SHORTCUT'});
+ if(level.portals.some(p=>p.kind==='secret'))level.signs.push({x:level.portals.find(p=>p.kind==='secret').x-90,y:level.portals.find(p=>p.kind==='secret').top,label:'SECRET EXIT: ENDS STAGE / UNLOCKS SHORTCUT — NO SHARD'});
  level.timeLimit+=60;return level;
 }
 export function makeBonus(parent){
@@ -50,5 +52,5 @@ export function drawSecrets(ctx,level,data,time){
  for(const r of level.relics||[]){const found=data.relics.includes(r.id);ctx.save();ctx.globalAlpha=found?.25:1;ctx.fillStyle=found?'#a5d7c5':'#f9d985';ctx.beginPath();ctx.moveTo(r.x+11,r.y);ctx.lineTo(r.x+22,r.y+13);ctx.lineTo(r.x+11,r.y+26);ctx.lineTo(r.x,r.y+13);ctx.closePath();ctx.fill();ctx.strokeStyle='#fff3c4';ctx.lineWidth=2;ctx.stroke();ctx.fillStyle='#9c7cc6';ctx.fillRect(r.x+8,r.y+9,6,8);ctx.restore();
   if(r.hidden){ctx.strokeStyle='#597f76';ctx.lineWidth=5;ctx.strokeRect(r.x-12,r.y-12,48,48);ctx.fillStyle='#8eab87';ctx.fillRect(r.x-14,r.y-12,14,48);ctx.fillRect(r.x+34,r.y-12,8,48)}
  }
- for(const b of level.portals||[]){ctx.fillStyle=b.kind==='secret'?'#be8cbb':b.kind==='return'?'#87ccde':'#e7c887';ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle='#193b49';ctx.fillRect(b.x+7,b.y+9,b.w-14,b.h-9);ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillStyle='#fff1ce';ctx.fillText(b.kind==='secret'?'SECRET ↑':b.kind==='return'?'RETURN ↑':'BONUS ↑',b.x+b.w/2,b.y-9)}
+ for(const b of level.portals||[]){ctx.fillStyle=(b.kind==='secret'||b.kind==='trial-finish'&&level.sourcePortal.kind==='secret')?'#be8cbb':b.kind==='return'?'#87ccde':'#e7c887';ctx.fillRect(b.x,b.y,b.w,b.h);ctx.fillStyle='#193b49';ctx.fillRect(b.x+7,b.y+9,b.w-14,b.h-9);ctx.font='bold 10px monospace';ctx.textAlign='center';ctx.fillStyle='#fff1ce';ctx.fillText(b.kind==='secret'?'SECRET EXIT ↑':b.kind==='return'?'RETURN ↑':b.kind==='trial-finish'?(level.sourcePortal.kind==='secret'?'SECRET EXIT ↑':'BONUS ROOM ↑'):'BONUS ↑',b.x+b.w/2,b.y-9)}
 }

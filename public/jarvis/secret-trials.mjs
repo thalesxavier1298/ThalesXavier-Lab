@@ -16,7 +16,7 @@ export function makeSecretTrial(parent,portal){
   room.platforms.push({x:580,y:390,w:90,h:18},{x:820,y:330,w:100,h:18},{x:1050,y:390,w:90,h:18});
   room.trialTargets=hammer?[{x:710,y:300,w:28,h:40,lit:false},{x:970,y:240,w:28,h:40,lit:false},{x:1230,y:300,w:28,h:40,lit:false}]:[{x:710,y:425,w:24,h:35,lit:false},{x:920,y:425,w:24,h:35,lit:false},{x:1160,y:425,w:24,h:35,lit:false}];
   if(hammer&&hard)room.trialTargets.push({x:1340,y:385,w:28,h:35,lit:false});
-  room.signs=[{x:170,y:470,label:hammer?'HAMMER: CLIMB AND ARC SHOTS INTO THREE BELLS':'FIRE: LIGHT THE THREE BRAZIERS'},{x:580,y:470,label:hammer?'JUMP THE LEDGES — HAMMERS CURVE OVER OBSTACLES':'JUMP THE LEDGES AND AIM BOUNCING FIREBALLS'}];
+  room.signs=[{x:170,y:470,label:hammer?(hard?'HAMMER: CLIMB AND HIT ALL FOUR BELLS':'HAMMER: CLIMB AND HIT ALL THREE BELLS'):'FIRE: LIGHT THE THREE BRAZIERS'},{x:580,y:470,label:hammer?'JUMP THE LEDGES — HAMMERS CURVE OVER OBSTACLES':'JUMP THE LEDGES AND AIM BOUNCING FIREBALLS'}];
  }
  room.gate={x:1430,y:heli?-40:250,w:30,h:220,broken:false};room.blocks.push(room.gate);return room;
 }

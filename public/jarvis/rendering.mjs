@@ -112,7 +112,8 @@ export function drawMechanics(ctx,level,player,checkpoint,time){
   r(ctx,c.x+4,c.top-78,38,24,i<=checkpoint?'#8bd7c0':'#f7cd69');
   ctx.font='bold 10px monospace';ctx.fillStyle='#173b49';ctx.fillText('CP',c.x+13,c.top-62);
  }
- for(const s of level.signs||[]){
+ const signs=level.isTrial||level.isBonus?(level.signs||[]):level.index<2?(level.signs||[]).filter(s=>s.x<700&&!level.checkpoints.some((c,i)=>i>0&&Math.abs(c.x-s.x)<180)).slice(0,2):[];
+ for(const s of signs){
   // Each cue is anchored at the height of the relevant safe observation area.
   r(ctx,s.x,s.y-34,4,34,'#99735d');r(ctx,s.x-5,s.y-38,14,16,'#d9bd87');
   ctx.font='bold 10px monospace';ctx.textAlign='left';

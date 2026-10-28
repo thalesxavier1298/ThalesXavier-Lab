@@ -267,9 +267,9 @@ export function Projects() {
       </Heading>
       <article className="panel" style={{marginBottom:32,background:"linear-gradient(120deg, #152c40, #285748)",color:"#ecf5ef",padding:"clamp(24px, 5vw, 56px)"}}>
         <span className="eyebrow" style={{color:"#a5e5cf"}}>{lang === "pt" ? "NOVO · JOGO NO NAVEGADOR" : "NEW · BROWSER GAME"}</span>
-        <h2 style={{fontSize:"clamp(30px, 5vw, 52px)",margin:"16px 0"}}>Jarvis: Skybound</h2>
+        <h2 style={{fontSize:"clamp(30px, 5vw, 52px)",margin:"16px 0"}}>Teófilo: Reino do Céu</h2>
         <p style={{color:"#cadfd9",maxWidth:650}}>{lang === "pt" ? "Uma aventura de plataforma original: 15 fases, uma torre, um castelo e cinco poderes. Explore o mapa e enfrente o Rei da Tempestade." : "An original platform adventure: 15 levels, a tower, a castle, and five powers. Explore the world map and face the Storm King."}</p>
-        <a className="button" href="/jarvis/" style={{marginTop:16,background:"#f7cd69",color:"#183b42"}}>{lang === "pt" ? "Jogar agora" : "Play Jarvis"} <ArrowUpRight size={17}/></a>
+        <a className="button" href="/jarvis/" style={{marginTop:16,background:"#f7cd69",color:"#183b42"}}>{lang === "pt" ? "Jogar agora" : "Play Teófilo"} <ArrowUpRight size={17}/></a>
       </article>
       <div className="filters">
         {["all", "ai", "content", "productivity"].map((v, i) => (

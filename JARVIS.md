@@ -1,3 +1,3 @@
-# Jarvis Adventure
+# Teófilo: Reino do Céu
 
-Versão atual: 11.2 — Crossroads. Consulte CHECKPOINT11-2.md. Atalhos descobertos têm caminhos de terra e placas nas duas pontas: A/1 secreto, B/2 normal. Setas e Enter/Espaço, clique e toque também selecionam. Esc fecha; S reabre. Preserva os 51 fragmentos, saídas salvas e desafios da versão 11.1. O jogo continua em /jarvis/.
+Versão atual: 11.7. Consulte CHECKPOINT11-7.md. Novo final com caminho, pé de feijão e reino do céu; mensagens para shards pendentes ou 51/51 (100%). Nome visível atualizado para Teófilo. Mantém /jarvis/ e chaves de salvamento antigas para compatibilidade. Inclui 11.3 a 11.6.

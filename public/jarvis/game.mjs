@@ -1,3 +1,4 @@
+import {createEnding,stepEnding,drawEnding,endingCollection} from './ending.mjs';
 import {makeSecretTrial,stepSecretTrial,drawSecretTrial} from './secret-trials.mjs';
 import {DISCOVERY_KEY,SECRET_ROUTES,BONUS_STAGES,readDiscoveries,saveDiscoveries,collectRelic,discoverExit,stageAvailable,stageCleared,clearedCount,finishStage,relicCount,makeBonus,portalAt,drawSecrets} from './secrets.mjs';
 import {pickIce,releaseIce,clearCarry,smashIce,stepCarriedAndThrown} from './ice.mjs';
@@ -18,6 +19,7 @@ let level=null,p=null,keys=new Set(),pressed=new Set(),shots=[],clouds=[],partic
 let runState;try{runState=readRun(localStorage)}catch{runState={lives:INITIAL_LIVES,stage:0}}
 let lifeNotice=0,wonSpaceReady=false,mapSpaceBlocked=false;
 let discoveries;try{discoveries=readDiscoveries(localStorage)}catch{discoveries={relics:[],exits:[],cleared:[]}}let bonusVisit=null;let junction=null;
+let ending=null;
 let remaining=0,deathReason='hit',mapIndex=0,mapTravel=null,entryHeld=false;
 function persistDiscoveries(){try{saveDiscoveries(discoveries,localStorage)}catch{}}
 function persistRun(){try{saveRun(runState,localStorage)}catch{}}
@@ -39,8 +41,8 @@ function renderMap(){
  return '<g class="stage '+(locked?'locked':'')+(i===mapIndex?' selected':'')+'" role="button" tabindex="'+(locked?'-1':'0')+'" aria-disabled="'+locked+'" aria-label="'+s.name+' — '+makeLevel(i).mechanic+(locked?', locked':done?', cleared':', ready')+'" data-stage="'+i+'"><circle class="selection-ring" cx="'+x+'" cy="'+y+'" r="34" fill="none" stroke="#ffe8a2" stroke-width="3"/><ellipse cx="'+x+'" cy="'+(y+14)+'" rx="38" ry="17" fill="#0b2435" opacity=".4"/><circle cx="'+x+'" cy="'+y+'" r="'+(s.boss?29:23)+'" fill="'+(done?'#86c6a0':locked?'#284957':'#f7cd69')+'" stroke="'+(locked?'#53747a':'#e7edbd')+'" stroke-width="3" filter="url(#shadow)"/><text x="'+x+'" y="'+(y+4)+'" text-anchor="middle" fill="'+(locked?'#8ca8ad':'#173e42')+'">'+(done?'✓':label)+'</text><text x="'+x+'" y="'+(y+46)+'" text-anchor="middle" fill="#fff7dc" stroke="#203e37" stroke-width="4" paint-order="stroke" style="font-size:11px">'+s.name+'</text>'+'<text x="'+x+'" y="'+(y+62)+'" text-anchor="middle" fill="#ffe3a3" stroke="#203e37" stroke-width="3" paint-order="stroke" style="font-size:10px">'+relicCount(discoveries,i)+'/3 shards</text>'+(s.boss?landmarkSvg(i===8,x,y):'')+(false?'<text x="'+x+'" y="'+(y-(s.boss?103:39))+'" text-anchor="middle" fill="#f7cd69">JARVIS</text>':'')+'</g>'
  }).join('')+'<g id="map-jarvis" aria-hidden="true" transform="translate('+coords[mapIndex].x+' '+(coords[mapIndex].y-18)+')">'+MAP_JARVIS+'</g></svg>';
  const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,coords[mapIndex].x*mapBox.scrollWidth/960-mapBox.clientWidth/2);
- const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!discoveries.exits.length;$('secret-map').textContent=secretRoute?'Escolher caminho A / B (S)':'Encruzilhadas descobertas (S)';renderShortcuts();
- $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(discoveries.exits.length?' · Placa: escolha A/B · S: encruzilhadas':'');
+ const secretRoute=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));$('secret-map').hidden=!discoveries.exits.length;$('secret-map').textContent=secretRoute?'Escolher caminho A–D (S)':'Encruzilhadas descobertas (S)';renderShortcuts();
+ $('map-selected').textContent=STAGES[mapIndex].name+' — Arrows to walk · Space to enter'+(discoveries.exits.length?' · Placa: escolha A–D · S: encruzilhadas':'');
  document.querySelectorAll('[data-stage]').forEach(el=>{const go=()=>{const i=Number(el.dataset.stage);if(stageAvailable(i,unlocked,discoveries))start(i)};el.onclick=go;el.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();e.stopPropagation();entryHeld=e.key===' ';go()}}});
 }
 function walkMap(key,secret=false){if(mode!=='map'||mapTravel||junction)return;const edge=secret&&SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex&&key==='ArrowRight'||r.to===mapIndex&&key==='ArrowLeft'));if(edge){openJunction(mapIndex);return}const next=mapNeighbor(mapIndex,key,unlocked,i=>stageAvailable(i,unlocked,discoveries));if(next!==mapIndex)mapTravel={from:mapIndex,to:next,t:0}}
@@ -49,7 +51,7 @@ for(const [id,key] of [['map-left','ArrowLeft'],['map-right','ArrowRight'],['map
 $('map-enter').onclick=()=>enterMap();
 $('secret-map').onclick=()=>{const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===mapIndex||r.to===mapIndex));if(r)takeShortcut(r.from);else $('shortcut-list').hidden=!$('shortcut-list').hidden};
 function stepMap(dt){if(!mapTravel)return;mapTravel.t=Math.min(1,mapTravel.t+dt/.35);const at=mapPosition(mapTravel.from,mapTravel.to,mapTravel.t);$('map-jarvis').setAttribute('transform','translate('+at.x+' '+(at.y-18+Math.sin(mapTravel.t*Math.PI*6)*2)+')');const mapBox=$('island-map');if(mapBox.clientWidth&&mapBox.scrollWidth>mapBox.clientWidth)mapBox.scrollLeft=Math.max(0,at.x*mapBox.scrollWidth/960-mapBox.clientWidth/2);if(mapTravel.t===1){const arrivedBy=mapTravel.kind;mapIndex=mapTravel.to;mapTravel=null;renderMap();if(arrivedBy!=='secret')openJunction(mapIndex)}}
-function showMap(){closeJunction();restoreBonus();clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,16);if(!stageAvailable(mapIndex,unlocked,discoveries))mapIndex=Math.min(unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap();openJunction(mapIndex)}
+function showMap(){ending=null;closeJunction();restoreBonus();clearCarry(p);$('quit-level').hidden=true;$('cloud-retry').hidden=true;mapIndex=Math.min(level?.index??runState.stage??0,16);if(!stageAvailable(mapIndex,unlocked,discoveries))mapIndex=Math.min(unlocked,16);mapTravel=null;mode='map';keys.clear();pressed.clear();$('map').hidden=false;$('play').hidden=true;$('overlay').hidden=true;$('map-button').hidden=true;$('pause').hidden=true;$('world-title').textContent='GREEN VALLEY';$('status').textContent=runState.lives===0?'No lives left. Choose a stage to start again with 5 lives.':unlocked===17?'The Storm King has fallen. Replay any stage to collect more starlight.':'Choose an unlocked stage. Your next destination is highlighted.';renderMap()}
 $('map-button').onclick=showMap;
 function retryCloudTrial(){if(level?.isTrial){retrySecretTrial();return}
  if(!['play','paused'].includes(mode)||!level.cloudTrials)return;
@@ -60,7 +62,7 @@ function retryCloudTrial(){if(level?.isTrial){retrySecretTrial();return}
 $('cloud-retry').onclick=retryCloudTrial;
 
 $('reset').onclick=()=>{if(confirm('Reset all stages, coins, lives, star shards and secret paths on this device?')){closeJunction();unlocked=0;discoveries={relics:[],exits:[],cleared:[]};persistDiscoveries();runState.coins=0;runState.lifeClaims=[];mapIndex=0;mapTravel=null;resetLives(runState);runState.stage=0;persistRun();try{localStorage.removeItem('jarvis-skybound-v1')}catch{}renderMap()}};
-function start(i){closeJunction();bonusVisit=null;clearCarry(p);level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=level.identity+' — '+level.mechanic+'. Shift = run; Down + move = crawl.'}
+function start(i){ending=null;closeJunction();bonusVisit=null;clearCarry(p);level=buildLevel(i);runState.stage=i;if(runState.lives===0){gameOver();return}persistRun();$('cloud-retry').hidden=true;checkpoint=0;score=0;lifeNotice=0;accumulator=0;respawn(runState.state||STATES.SMALL);$('map').hidden=true;$('play').hidden=false;$('overlay').hidden=true;$('map-button').hidden=false;$('pause').hidden=false;$('pause').textContent='Pause';$('world-title').textContent=level.name.toUpperCase();mode='play';canvas.focus();$('status').textContent=i<2?'Arrows: move · Space: jump · Shift: run · X: power · Esc: pause.':''}
 function respawn(state=STATES.SMALL){clearCarry(p);
  const fresh=resetWorld(level,checkpoint);p=createPlayer(fresh.spawn.x,fresh.spawn.y);p.ground=true;transformPlayer(p,state,solidsFor(level),{animate:false});p.inv=PHYSICS.invincibility;
  shots=[];clouds=[];particles=[];items=fresh.items;remaining=level.timeLimit;
@@ -85,11 +87,19 @@ function deathScreen(){
  if(runState.lives===0){gameOver();return}
  mode='dead';
  modal(deathReason==='timeout'?'TIME UP':'One more try?',
- 'Click to continue or press Space. Lives left: '+runState.lives+'. Return as Small Jarvis at your checkpoint with a fresh timer.','Retry stage',()=>{
+ 'Click to continue or press Space. Lives left: '+runState.lives+'. Return as Small Teófilo at your checkpoint with a fresh timer.','Retry stage',()=>{
  const i=level.index,cp=checkpoint;start(i);checkpoint=cp;respawn();mode='play';$('overlay').hidden=true;
  });
 }
-function win(){wonSpaceReady=!keys.has('Space')&&!entryHeld;clearCarry(p);clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=finishStage(discoveries,level.index,unlocked);persistDiscoveries();try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);modal(level.index===16?'The sky is yours, Jarvis!':'Stage cleared!',level.index===16?'The Storm King is defeated! Revisit cleared trails, finish unexplored stages and find every star shard.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.','Return to world map',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()});$('overlay-copy').textContent+=' Click to continue or press Space.'}
+function win(){
+ wonSpaceReady=!keys.has('Space')&&!entryHeld;clearCarry(p);clearLifeClaim(runState,level.index);runState.state=p.state;persistRun();mode='won';unlocked=finishStage(discoveries,level.index,unlocked);persistDiscoveries();try{localStorage.setItem('jarvis-skybound-v1',String(unlocked))}catch{}tone(880,.3);
+ const final=level.index===16;
+ modal(final?'Fase concluída!':'Stage cleared!',final?'Você derrotou o boss final! Um novo caminho leva ao pé de feijão e ao reino do céu.':level.name+' complete. You collected '+score+' starlight coins. The next path is open.',final?'Seguir para o céu':'Return to world map',()=>{if(final)beginEnding();else {mapSpaceBlocked=!wonSpaceReady;showMap()}});$('overlay-copy').textContent+=final?' Clique para continuar ou pressione Espaço.':' Click to continue or press Space.';
+}
+function beginEnding(){closeJunction();ending=createEnding();mode='ending';keys.clear();pressed.clear();$('overlay').hidden=true;$('map').hidden=true;$('play').hidden=false;$('map-button').hidden=true;$('pause').hidden=true;$('cloud-retry').hidden=true;$('world-title').textContent='A CAMINHO DO REINO DO CÉU';$('status').textContent='';canvas.focus()}
+function endingVictory(){mode='ending-message';wonSpaceReady=!keys.has('Space');$('world-title').textContent='REINO DO CÉU';modal('Você conquistou o céu!','Parabéns, Teófilo! Você matou o boss final e conquistou o céu.','Ver meus shards',endingShards)}
+function endingShards(){const result=endingCollection(discoveries);mode='ending-message';modal(result.complete?'100% CONCLUÍDO!':'Ainda há shards para descobrir',result.complete?'Parabéns, você coletou todos os coletáveis do jogo. Agora você zerou 100% dele! 51/51 shards.':'Você tem alguns shards para coletar ainda. Volte nas fases e colete tudo. Você encontrou '+result.count+'/51 shards.','Voltar ao mapa',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()})}
+
 function hit(){
  const result=damagePlayer(p,solidsFor(level));
  if(result!=='ignored'&&p.carry)releaseIce(p,level,{force:true,onBreak:iceBurst});
@@ -130,7 +140,7 @@ function update(dt){
  run:keys.has('ShiftLeft')||keys.has('ShiftRight'),
  down:keys.has('ArrowDown')||keys.has('KeyS')
  };
- if(level.isTrial){$('cloud-retry').hidden=false;$('cloud-retry').textContent='Retry secret trial (C)'}else $('cloud-retry').textContent='Retry cloud trial';
+ if(level.isTrial){$('cloud-retry').hidden=false;$('cloud-retry').textContent=level.sourcePortal.kind==='secret'?'Retry secret exit (C)':'Retry bonus challenge (C)'}else $('cloud-retry').textContent='Retry cloud trial';
  if(!level.isTrial&&level.cloudTrials)$('cloud-retry').hidden=!level.cloudTrials.some(t=>p.x>=t.start-24);
  const result=stepPlayer(p,input,dt,level,clouds,bumpBlock);
  if(result.jumped)tone(520);
@@ -141,7 +151,7 @@ function update(dt){
  for(const block of level.blocks){block.bump=Math.max(0,(block.bump||0)-dt);block.impactLock=Math.max(0,(block.impactLock||0)-dt)}
  for(const b of clouds)b.life-=dt;
  clouds=clouds.filter(b=>b.life>0);
- stepItems(items,dt,level,p,item=>{if(item.type==='life'){if(claimLife(runState,level.index)){persistRun();extraLifeNotice()}return}if(item.type==='coin'){collectCoin();burst(item.x+14,item.y+14,'#f7cd69');tone(1100,.04);return}tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+'. Shift to run; X to use a special power.'});
+ stepItems(items,dt,level,p,item=>{if(item.type==='life'){if(claimLife(runState,level.index)){persistRun();extraLifeNotice()}return}if(item.type==='coin'){collectCoin();burst(item.x+14,item.y+14,'#f7cd69');tone(1100,.04);return}tone(760,.18);$('status').textContent=(p.pending?'Growth queued until there is headroom':p.state+' acquired')+(level.index<2?'. Shift to run; X to use a special power.':'')});
  if((pressed.has('ArrowUp')||pressed.has('KeyW'))&&portalAt(level,p)){usePortal(portalAt(level,p));pressed.clear();return}
  for(const r of level.relics||[])if(overlap(p,r)&&collectRelic(discoveries,r.id)){persistDiscoveries();burst(r.x+11,r.y+13,'#f9d985');tone(1200,.15);$('status').textContent='Star shard found! '+relicCount(discoveries,level.index)+'/3 — saved.'}
  const reached=level.isBonus?checkpoint:checkpointReached(level,p,checkpoint);
@@ -169,7 +179,7 @@ function update(dt){
  stepSecretTrial(level,p,shots);
  shots=shots.filter(s=>s.life>0&&s.y<650&&s.x>-100&&s.x<level.width+100);
  for(const a of particles){a.life-=dt;a.x+=a.vx*dt;a.y+=a.vy*dt;a.vy+=450*dt}particles=particles.filter(a=>a.life>0);
- if(p.x>=level.goal&&(!boss||boss.hp<=0)){win();return}
+ if(level.index===16&&boss?.hp<=0||p.x>=level.goal&&(!boss||boss.hp<=0)){win();return}
  camera=Math.max(0,Math.min(level.width-960,p.x-300));
  pressed.clear();
 }
@@ -180,6 +190,7 @@ function circle(x,y,r,c){
 }
 function text(t,x,y,size=16,c='#fff',align='left'){ctx.font='600 '+size+'px monospace';ctx.fillStyle=c;ctx.textAlign=align;ctx.fillText(t,x,y)}
 function draw(){
+ if(ending&&['ending','ending-message'].includes(mode)){drawEnding(ctx,ending,p);$('progress').textContent='TEÓFILO · '+endingCollection(discoveries).count+'/51 shards';return}
  if(mode!=='map'){const hud='Lives '+runState.lives+' · Time '+Math.ceil(remaining);if($('progress').textContent!==hud)$('progress').textContent=hud}
  background(ctx,level.theme,camera,clock);
  ctx.save();ctx.translate(-Math.round(camera/2)*2,0);
@@ -192,17 +203,17 @@ function draw(){
  drawSecrets(ctx,level,discoveries,clock);drawSecretTrial(ctx,level);
  for(const e of level.enemies)drawEnemy(ctx,e,clock);
  const boss=level.chief;
- if(boss&&boss.hp>0){if(level.index===16&&boss.state==='warn'){const t=boss.arena[boss.target];rect(t.x-6,t.y+boss.h-6,84,6,'#ffc778');text('LANDING',t.x+36,t.y-10,11,'#ffdc8a','center')}rect(boss.x,boss.y,boss.w,boss.h,boss.cool>0?'#f6cb72':'#40375c');rect(boss.x-10,boss.y+12,92,20,'#77618c');for(let i=0;i<3;i++)rect(boss.x+10+i*22,boss.y-12,12,18,'#f7cd69');rect(boss.x+12,boss.y+30,12,8,'#fcba72');rect(boss.x+48,boss.y+30,12,8,'#fcba72');rect(boss.x,boss.y-30,72,5,'#221b36');rect(boss.x,boss.y-30,72*boss.hp/boss.max,5,'#f7cd69');if(level.index===16)text('PHASE '+boss.phase+' · '+boss.state.toUpperCase(),boss.x+36,boss.y-60,10,boss.state==='recover'?'#a8edb4':'#ffe2a3','center');text(level.index===16?'STORM KING':'THE SENTINEL',boss.x+36,boss.y-44,12,'#fff','center')}
+ if(boss&&boss.hp>0){if(level.index===16&&boss.state==='warn'){const t=boss.arena[boss.target];rect(t.x-6,t.y+boss.h-6,84,6,'#ffc778');text('LANDING',t.x+36,t.y-10,11,'#ffdc8a','center')}rect(boss.x,boss.y,boss.w,boss.h,boss.cool>0?'#f6cb72':'#40375c');rect(boss.x-10,boss.y+12,92,20,'#77618c');for(let i=0;i<3;i++)rect(boss.x+10+i*22,boss.y-12,12,18,'#f7cd69');rect(boss.x+12,boss.y+30,12,8,'#fcba72');rect(boss.x+48,boss.y+30,12,8,'#fcba72');rect(boss.x,boss.y-30,72,5,'#221b36');rect(boss.x,boss.y-30,72*boss.hp/boss.max,5,'#f7cd69');text(level.index===16?'STORM KING':'THE SENTINEL',boss.x+36,boss.y-44,12,'#fff','center')}
  for(const s of shots){ctx.save();ctx.translate(s.x+8,s.y+8);if(s.type==='hammer'||s.style==='hammer'){ctx.rotate(clock*14);rect(-3,-8,6,24,'#dbad74');rect(-12,-10,24,12,s.owner==='enemy'?'#f4b98d':colors.hammer)}else circle(0,0,8,s.type==='enemy'?'#ef8580':colors[s.type]);ctx.restore()}
  if(!level.isBonus&&!level.isTrial){const goal=level.goal;rect(goal,level.goalY-170,6,170,'#ece6bd');rect(goal+6,level.goalY-170,48,30,boss&&boss.hp>0?'#a47e8b':'#f7cd69');circle(goal+3,level.goalY-175,9,'#fff2ae');text(boss&&boss.hp>0?'DEFEAT THE GUARDIAN':'FINISH',goal,level.goalY-188,12,'#fff','center');
  }
  drawSprite(ctx,p,clock);
  for(const a of particles){ctx.globalAlpha=Math.max(0,a.life/.6);rect(a.x,a.y,4,4,a.color);ctx.globalAlpha=1}
  ctx.restore();
- rect(16,14,280,62,'#10283ad9');text('JARVIS',30,36,12,'#8bd7c0');text(p.state,30,61,14,'#f0dba1');text((runState.coins||0)+'/50',123,59,14,'#f7cd69');text(p.power.toUpperCase(),195,37,10,colors[p.power]);text(p.power==='cloud'?p.charges+' clouds':'X · POWER',195,58,10,'#dae8ee');
- if(p.carry){rect(280,496,400,30,'#10283add');text((p.carry.carryType==='shell'?'SHELL':'ICE')+': E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
+ rect(16,14,280,62,'#10283ad9');text('TEÓFILO',30,36,12,'#8bd7c0');text(p.state,30,61,14,'#f0dba1');text((runState.coins||0)+'/50',123,59,14,'#f7cd69');text(p.power.toUpperCase(),195,37,10,colors[p.power]);text(p.power==='cloud'?p.charges+' clouds':'X · POWER',195,58,10,'#dae8ee');
+ if(p.carry&&(level.index<2||level.isTrial||level.isBonus)){rect(280,496,400,30,'#10283add');text((p.carry.carryType==='shell'?'SHELL':'ICE')+': E/J DROP · X/K THROW',480,516,13,'#c5f3ff','center')}
  rect(312,14,145,35,'#10283add');text([0,1,2].map(i=>discoveries.relics.includes(level.index+':'+i)?'◆':'◇').join(' '),384,38,19,'#f9d985','center');
- if(level.isTrial){rect(310,82,340,28,'#132c40');text(level.trialSolved?'GATE OPEN — REACH THE FAR ARCH':'OPTIONAL TRIAL · C RETRIES · BLUE ARCH RETURNS',480,101,11,'#f8df9f','center')}
+ if(level.isTrial){rect(310,82,340,28,'#132c40');text(level.trialSolved?(level.sourcePortal.kind==='secret'?'SECRET EXIT OPEN — ENDS STAGE':'BONUS OPEN — SHARD THEN RETURN'):(level.sourcePortal.kind==='secret'?'SECRET EXIT · NO SHARD · C RETRIES':'BONUS CHALLENGE · SHARD + RETURN · C RETRIES'),480,101,11,'#f8df9f','center')}
  if(lifeNotice>0)text('1-UP! EXTRA LIFE',480,100,20,'#a3f093','center');
  rect(650,14,182,62,'#10283ad9');text('LIVES '+runState.lives,662,37,14,'#f7cd69');text('TIME '+Math.ceil(remaining),662,60,14,remaining<=60?'#ff9b87':'#e5eeec');
  text(level.boss?'BOSS STAGE':'STAGE '+(level.index>8?level.index:level.index+1),930,36,12,'#fff','right');
@@ -210,6 +221,7 @@ function draw(){
 function frame(t){
  const elapsed=Math.max(0,Math.min((t-last)/1000||0,.1));last=t;
  if(mode==='map')stepMap(elapsed);
+ if(mode==='ending'&&stepEnding(ending,elapsed))endingVictory();
  if(mode==='play'){
  accumulator=Math.min(accumulator+elapsed,.1);
  while(accumulator>=PHYSICS.fixedStep&&mode==='play'){update(PHYSICS.fixedStep);accumulator-=PHYSICS.fixedStep}
@@ -220,17 +232,21 @@ function frame(t){
  if(level&&mode!=='map')draw();requestAnimationFrame(frame);
 }
 function onKeyDown(e){
+ if(e.target?.id==='fullscreen'&&(e.code==='Space'||e.code==='Enter'))return;
  if(junction){
-  if(['KeyA','KeyB','Digit1','Digit2','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space','Escape','Tab'].includes(e.code)){e.preventDefault();if(e.repeat||e.code==='Space'&&mapSpaceBlocked)return;
+  if(['KeyA','KeyB','KeyC','KeyD','Digit1','Digit2','Digit3','Digit4','ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Enter','Space','Escape','Tab'].includes(e.code)){e.preventDefault();if(e.repeat||e.code==='Space'&&mapSpaceBlocked)return;
    if(e.code==='Escape'){closeJunction();$('map-enter').focus();return}
    if(e.code==='KeyA'||e.code==='Digit1'){chooseJunction('secret');return}
    if(e.code==='KeyB'||e.code==='Digit2'){chooseJunction('normal');return}
+   if(e.code==='KeyC'||e.code==='Digit3'){chooseJunction('back');return}
+   if(e.code==='KeyD'||e.code==='Digit4'){chooseJunction('stage',e.code==='Space');return}
    if(e.code==='Enter'||e.code==='Space'){chooseJunction(junction.selection,e.code==='Space');return}
-   if(e.code==='Tab'){const choices=['secret','normal','cancel'];junction.selection=choices[(choices.indexOf(junction.selection)+(e.shiftKey?2:1))%3]}else junction.selection=(e.code==='ArrowLeft'||e.code==='ArrowUp')?'secret':'normal';$(junction.selection==='secret'?'junction-a':junction.selection==='normal'?'junction-b':'junction-close').focus();paintJunction();
+   const choices=['secret',...($('junction-b').hidden?[]:['normal']),...($('junction-c').hidden?[]:['back']),'stage','cancel'];const direction=e.code==='Tab'?(e.shiftKey?-1:1):(e.code==='ArrowLeft'||e.code==='ArrowUp'?-1:1);junction.selection=choices[(choices.indexOf(junction.selection)+direction+choices.length)%choices.length];$({secret:'junction-a',normal:'junction-b',back:'junction-c',stage:'junction-d',cancel:'junction-close'}[junction.selection]).focus();paintJunction();
   }return;
  }
 
- if(['won','dead','gameover'].includes(mode)){if(e.code==='Space'){e.preventDefault();if(!e.repeat&&wonSpaceReady){wonSpaceReady=false;mapSpaceBlocked=true;$('continue').onclick();if(mode==='play')entryHeld=true}}return}
+ if(['won','dead','gameover','ending-message'].includes(mode)){if(e.code==='Space'){e.preventDefault();if(!e.repeat&&wonSpaceReady){wonSpaceReady=false;mapSpaceBlocked=true;$('continue').onclick();if(mode==='play')entryHeld=true}}return}
+ if(mode==='ending'){e.preventDefault();return}
  if(mode==='dying'){if(e.code==='Space'){e.preventDefault();wonSpaceReady=false;keys.add('Space')}return}
  if(mode==='map'){if(e.code==='Space'&&e.target?.matches?.('[data-shortcut],#secret-map'))return;if(e.code==='KeyS'){e.preventDefault();if(!e.repeat)$('secret-map').onclick();return}if(e.code==='Space'&&mapSpaceBlocked){e.preventDefault();return}if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Space'].includes(e.code)){e.preventDefault();if(!e.repeat){if(e.code==='Space')enterMap(true);else walkMap(e.code,e.shiftKey)}}return}if(entryHeld&&e.code==='Space')return;if(['Space','ArrowLeft','ArrowRight','ArrowUp','ArrowDown'].includes(e.code))e.preventDefault();if(e.target.tagName==='BUTTON'&&(e.code==='Space'||e.code==='Enter'))return;if(!e.repeat){pressed.add(e.code);if(e.code==='KeyP'||e.code==='Escape')pause();if(e.code==='KeyC'&&mode==='play')retryCloudTrial();if(e.code==='KeyR'&&mode==='play')start(level.index)}keys.add(e.code)}
 document.addEventListener('keydown',onKeyDown);
@@ -244,7 +260,7 @@ showMap();requestAnimationFrame(frame);
 function secretPathsSvg(){return SECRET_ROUTES.filter(r=>discoveries.exits.includes(r.from)).map(r=>{
  const a=MAP_POINTS[r.from],b=MAP_POINTS[r.to],d='M '+a.x+' '+a.y+' Q '+((a.x+b.x)/2)+' '+(Math.min(a.y,b.y)-120)+' '+b.x+' '+b.y;
  const road='<g role="button" tabindex="0" aria-label="Encruzilhada: '+STAGES[r.from].name+' e '+STAGES[r.to].name+'" data-route="'+r.from+'" style="cursor:pointer"><path d="'+d+'" fill="none" stroke="#5f5139" stroke-width="18" stroke-linecap="round"/><path d="'+d+'" fill="none" stroke="#b8905f" stroke-width="12" stroke-linecap="round"/><path d="'+d+'" fill="none" stroke="#dfc18b" stroke-width="3" stroke-linecap="round"/></g>';
- const signs=[r.from,r.to].map(i=>{const p=MAP_POINTS[i],x=Math.min(900,p.x+42),y=p.y-35;return '<g data-junction="'+i+'" role="button" tabindex="0" aria-label="Escolher caminho em '+STAGES[i].name+'" transform="translate('+x+' '+y+')" style="cursor:pointer"><path d="M-3 0H3V30H-3" fill="#775036"/><path d="M-23-9H15L25 0L15 9H-23Z" fill="'+(i===mapIndex?'#edc178':'#ba8956')+'" stroke="#4f4532" stroke-width="2"/><text x="0" y="4" text-anchor="middle" font-size="10" font-family="monospace" fill="#253b37">A / B</text></g>'}).join('');return road+signs;
+ const signs=[r.from,r.to].map(i=>{const p=MAP_POINTS[i],x=Math.min(900,p.x+42),y=p.y-35;return '<g data-junction="'+i+'" role="button" tabindex="0" aria-label="Escolher caminho em '+STAGES[i].name+'" transform="translate('+x+' '+y+')" style="cursor:pointer"><path d="M-3 0H3V30H-3" fill="#775036"/><path d="M-23-9H15L25 0L15 9H-23Z" fill="'+(i===mapIndex?'#edc178':'#ba8956')+'" stroke="#4f4532" stroke-width="2"/><text x="0" y="4" text-anchor="middle" font-size="10" font-family="monospace" fill="#253b37">ROTAS</text></g>'}).join('');return road+signs;
  }).join('')}
 
 function restoreBonus(){
@@ -259,7 +275,7 @@ function usePortal(portal){
  if(['bonus','secret'].includes(portal.kind)&&!portal.trialCleared)return enterSecretTrial(portal);
  if(portal.kind==='secret'){
   discoverExit(discoveries,level.index);persistDiscoveries();runState.state=p.state;persistRun();wonSpaceReady=!keys.has('Space');mode='won';
-  modal('Secret path discovered!',STAGES[portal.to].name+' is now reachable by the purple trail. Skipped stages remain unfinished. Click to continue or press Space.','Return to world map',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()});return true;
+  modal('Secret path discovered!',STAGES[portal.to].name+' is now reachable by the dirt shortcut. This secret exit ends your attempt. Bonus shards have a separate entrance; skipped stages remain unfinished. Click to continue or press Space.','Return to world map',()=>{mapSpaceBlocked=!wonSpaceReady;showMap()});return true;
  }
  if(portal.kind!=='bonus'||bonusVisit)return false;
  level.bonusRoom??=makeBonus(level);bonusVisit={level,checkpoint,shots,clouds,items,particles,x:portal.returnX,top:portal.top,camera};
@@ -277,7 +293,7 @@ function travelSecret(from){if(mode!=='map'||mapTravel||!discoveries.exits.inclu
 function enterSecretTrial(portal){
  portal.trialRoom??=makeSecretTrial(level,portal);bonusVisit={level,checkpoint,shots,clouds,items,particles,x:portal.returnX??portal.x,top:portal.top,camera};
  level=portal.trialRoom;shots=[];clouds=[];items=[];particles=[];p.x=70;p.y=470-p.h;p.vx=0;p.vy=0;p.ground=true;camera=0;keys.clear();pressed.clear();
- $('world-title').textContent=level.name.toUpperCase();$('status').textContent='Optional trial: use '+level.power.toUpperCase()+'. C retries; blue arch returns. Timer keeps running.';return true;
+ $('world-title').textContent=level.name.toUpperCase();$('status').textContent=(portal.kind==='secret'?'SECRET EXIT: finish this challenge to end the stage and unlock the shortcut. No shard here. ':'BONUS: finish this challenge, collect the shard, then return to the normal stage. ')+'Use '+level.power.toUpperCase()+'. C retries; blue arch returns. Timer keeps running.';return true;
 }
 function retrySecretTrial(){if(!level?.isTrial)return;const portal=level.sourcePortal;restoreBonus();portal.trialRoom=null;transformPlayer(p,STATES.SMALL,solidsFor(level),{animate:false});clearCarry(p);enterSecretTrial(portal);$('status').textContent='Trial reset without losing a life. Collect the two supplies again.'}
 
@@ -286,21 +302,39 @@ function openJunction(index,normalTarget=null){
  if(mode!=='map'||mapTravel)return false;const r=SECRET_ROUTES.find(r=>discoveries.exits.includes(r.from)&&(r.from===index||r.to===index));if(!r)return false;
  mapIndex=index;renderMap();const target=index===r.from?r.to:r.from;
  const forward=index+1,normal=normalTarget??(stageAvailable(forward,unlocked,discoveries)?forward:index);
- junction={from:index,route:r.from,secret:target,normal,selection:'secret'};
+ junction={from:index,route:r.from,secret:target,normal,back:index-1,selection:'secret'};
  $('junction-title').textContent='Encruzilhada — '+STAGES[index].name;
  $('junction-a').textContent='A / 1 — Caminho secreto: '+STAGES[target].name;
- $('junction-b').textContent='B / 2 — Caminho normal: '+(normal===index?'jogar esta fase':STAGES[normal].name);
+ $('junction-b').textContent='B / 2 — Seguir: '+(normal===index?'jogar esta fase':STAGES[normal].name);
+ $('junction-c').hidden=index===0||!stageAvailable(index-1,unlocked,discoveries);$('junction-c').textContent='C / 3 — Voltar: '+(STAGES[index-1]?.name||'');
+ $('junction-d').textContent='D / 4 — Ficar e jogar: '+STAGES[index].name;
  $('junction').hidden=false;$('shortcut-list').hidden=true;paintJunction();$('junction-a').focus();return true;
 }
-function paintJunction(){if(!junction)return;for(const [id,choice] of [['junction-a','secret'],['junction-b','normal']])$(id).setAttribute('aria-pressed',String(junction.selection===choice))}
+function paintJunction(){if(!junction)return;for(const [id,choice] of [['junction-a','secret'],['junction-b','normal'],['junction-c','back'],['junction-d','stage']])$(id).setAttribute('aria-pressed',String(junction.selection===choice))}
 function closeJunction(){junction=null;$('junction').hidden=true}
-function chooseJunction(choice,holdSpace=false){if(!junction||mode!=='map')return false;const j=junction;closeJunction();
+function chooseJunction(choice,holdSpace=false){if(!junction||mode!=='map')return false;const j=junction;if(choice==='back'&&!stageAvailable(j.back,unlocked,discoveries))return false;closeJunction();
  if(choice==='secret')return travelSecret(j.route);
+ if(choice==='stage'){entryHeld=holdSpace;start(mapIndex);return true}
+ if(choice==='back'){mapTravel={from:mapIndex,to:j.back,t:0,kind:'normal'};return true}
  if(choice!=='normal'){$('map-enter').focus();return false;}
  if(j.normal===mapIndex){entryHeld=holdSpace;start(mapIndex);return true}
  if(!stageAvailable(j.normal,unlocked,discoveries))return false;
  mapTravel={from:mapIndex,to:j.normal,t:0,kind:'normal'};return true;
 }
-$('junction-a').onclick=()=>chooseJunction('secret');$('junction-b').onclick=()=>chooseJunction('normal');
+$('junction-a').onclick=()=>chooseJunction('secret');$('junction-b').onclick=()=>chooseJunction('normal');$('junction-c').onclick=()=>chooseJunction('back');$('junction-d').onclick=()=>chooseJunction('stage');
 
 $('junction-close').onclick=()=>{closeJunction();$('map-enter').focus()};
+
+// Fullscreen changes presentation only; the level, timer and saved run stay intact.
+const gameShell=document.querySelector('.game-shell');
+function syncFullscreen(){const active=!!document.fullscreenElement||gameShell.classList.contains('expanded');$('fullscreen').textContent=active?'Sair da tela cheia':'Tela cheia';$('fullscreen').setAttribute('aria-pressed',String(active));(mode==='map'?$('map-enter'):canvas).focus()}
+$('fullscreen').onclick=async()=>{
+ try{
+  if(document.fullscreenElement)await document.exitFullscreen();
+  else if(gameShell.classList.contains('expanded')){gameShell.classList.remove('expanded');document.body.classList.remove('game-expanded')}
+  else if(gameShell.requestFullscreen&&document.fullscreenEnabled!==false)await gameShell.requestFullscreen();
+  else {gameShell.classList.add('expanded');document.body.classList.add('game-expanded')}
+ }catch{gameShell.classList.add('expanded');document.body.classList.add('game-expanded');$('status').textContent='Modo ampliado: este navegador não permitiu tela cheia nativa.'}
+ syncFullscreen();
+};
+document.addEventListener('fullscreenchange',syncFullscreen);
