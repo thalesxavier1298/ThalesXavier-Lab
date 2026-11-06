@@ -7,15 +7,17 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "postbuild": "node scripts/metadata.mjs",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "test:service": "node scripts/test-service-demo.mjs"
   },
   "dependencies": {
+    "lucide-react": "^0.468.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
-    "react-router-dom": "^7.9.0",
-    "lucide-react": "^0.468.0"
+    "react-router-dom": "^7.9.0"
   },
   "devDependencies": {
+    "react-test-renderer": "19.2.0",
     "vite": "^7.1.0"
   }
 }

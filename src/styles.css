@@ -792,6 +792,23 @@ footer > span {
 .event-list small {
   display: block;
 }
+.novadrive .demo-grid > * { min-width: 0; }
+.novadrive .bubble, .nova-summary { overflow-wrap: anywhere; white-space: pre-wrap; }
+.novadrive textarea {
+  display: block;
+  width: 100%;
+  margin: 10px 0;
+  padding: 13px;
+  font: inherit;
+  color: var(--ink);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  resize: vertical;
+}
+.novadrive form .button { display: block; margin-top: 16px; }
+.novadrive button:disabled { opacity: .5; cursor: default; }
+.nova-summary { border-top: 1px solid var(--line); padding-top: 16px; }
 .dashboard-toolbar {
   display: flex;
   justify-content: space-between;
