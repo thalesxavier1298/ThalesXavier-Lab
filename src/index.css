@@ -1,0 +1,254 @@
+@import 'tailwindcss';
+
+/* ─────────────────────────────────────────────────────────────
+   Design tokens. Every color in the UI resolves to one of these.
+   Dark is the default; light is a full mirror, not an afterthought.
+   Contrast targets: --text / --muted / --faint ≥ 4.5:1 on --bg.
+   ───────────────────────────────────────────────────────────── */
+:root,
+:root[data-tx-theme='dark'] {
+  --bg: #000000;
+  --surface: #0c0c0d;
+  --surface-2: #18181a;
+  --line: rgb(255 255 255 / 0.11);
+  --line-strong: rgb(255 255 255 / 0.22);
+  --text: #ffffff;
+  --muted: #a3a3a8;
+  --faint: #85858b;
+  --accent: #8a9bff; /* "signal" blue: used for routes, focus, live states */
+  --accent-soft: rgb(138 155 255 / 0.15);
+  --accent-ink: #000000;
+  --ok: #7fd1a8;
+  --warn: #e7c07a;
+  color-scheme: dark;
+}
+
+:root[data-tx-theme='light'] {
+  --bg: #ffffff;
+  --surface: #f6f6f5;
+  --surface-2: #ebebea;
+  --line: rgb(0 0 0 / 0.1);
+  --line-strong: rgb(0 0 0 / 0.2);
+  --text: #0a0a0a;
+  --muted: #55575c;
+  --faint: #6b6d72;
+  --accent: #3245d1;
+  --accent-soft: rgb(50 69 209 / 0.08);
+  --accent-ink: #ffffff;
+  --ok: #1d7a4f;
+  --warn: #8a5a00;
+  color-scheme: light;
+}
+
+/*
+ * Page ground and text color are deliberately NOT in a cascade layer.
+ * Hosts such as the artifact viewer ship their own unlayered reset for
+ * html/body (white page, black 14px system font); unlayered rules always
+ * beat layered ones, which left a white page under dark-theme text.
+ * Unlayered + "html body" specificity keeps the theme in charge.
+ */
+html:root {
+  background: var(--bg);
+  color: var(--text);
+  -webkit-text-size-adjust: 100%;
+}
+html body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  font-size: 1rem;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+
+  --font-display: 'Bricolage Grotesque Variable', 'Bricolage Grotesque', ui-sans-serif, system-ui, sans-serif;
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, monospace;
+}
+
+@layer base {
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+  ::selection {
+    background: var(--accent);
+    color: var(--accent-ink);
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+    border-radius: 4px;
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    font-family: var(--font-display);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+  p {
+    text-wrap: pretty;
+  }
+}
+
+@layer components {
+  /* Page gutter + max width used by every section. */
+  .shell {
+    width: 100%;
+    max-width: 88rem;
+    margin-inline: auto;
+    padding-inline: 1.25rem;
+  }
+  @media (min-width: 768px) {
+    .shell {
+      padding-inline: 2.5rem;
+    }
+  }
+
+  /* Display type scale (fluid). */
+  .t-mega {
+    font-family: var(--font-display);
+    font-size: clamp(2.9rem, 8.4vw, 8.75rem);
+    font-weight: 560;
+    font-variation-settings: 'wdth' 82, 'opsz' 96;
+    letter-spacing: -0.045em;
+    line-height: 0.92;
+  }
+  .t-xl {
+    font-family: var(--font-display);
+    font-size: clamp(2.25rem, 5.4vw, 5rem);
+    font-weight: 560;
+    font-variation-settings: 'wdth' 85, 'opsz' 96;
+    letter-spacing: -0.035em;
+    line-height: 0.98;
+  }
+  .t-lg {
+    font-family: var(--font-display);
+    font-size: clamp(1.6rem, 3vw, 2.5rem);
+    font-weight: 560;
+    letter-spacing: -0.025em;
+    line-height: 1.08;
+  }
+  .t-md {
+    font-family: var(--font-display);
+    font-size: clamp(1.25rem, 1.8vw, 1.5rem);
+    font-weight: 560;
+    letter-spacing: -0.015em;
+    line-height: 1.2;
+  }
+  .t-lede {
+    font-size: clamp(1.075rem, 1.4vw, 1.3rem);
+    line-height: 1.55;
+    color: var(--muted);
+  }
+  .t-small {
+    font-size: 0.875rem;
+    line-height: 1.5;
+  }
+
+  /* Hatched fill that marks every placeholder as illustrative. */
+  .hatch {
+    background-image: repeating-linear-gradient(
+      135deg,
+      var(--line) 0 1px,
+      transparent 1px 9px
+    );
+  }
+
+  /* Faint dot grid used behind interface mockups. */
+  .dotgrid {
+    background-image: radial-gradient(var(--line-strong) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+
+  /* Cursor spotlight for project previews (desktop only). */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+  .spotlight::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.4s ease;
+    background: radial-gradient(
+      420px circle at var(--mx, 50%) var(--my, 50%),
+      var(--accent-soft),
+      transparent 65%
+    );
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .spotlight:hover::after {
+      opacity: 1;
+    }
+  }
+
+  .skip-link {
+    position: absolute;
+    left: 1rem;
+    top: -4rem;
+    z-index: 100;
+    padding: 0.6rem 1rem;
+    border-radius: 999px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 600;
+  }
+  .skip-link:focus {
+    top: 1rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
+@keyframes playhead {
+  from {
+    left: 4%;
+  }
+  to {
+    left: 92%;
+  }
+}
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
