@@ -1,23 +1,25 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-tx-theme="dark">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <meta
-      name="description"
-      content="Thales Serra Xavier — business, AI solutions, workflow automation and digital innovation."
-    />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Thales Serra Xavier — business, AI solutions, workflow automation and digital innovation." />
     <meta property="og:title" content="Thales Serra Xavier | Portfolio" />
-    <meta
-      property="og:description"
-      content="Explore practical work in business automation, digital content and AI-assisted applications."
-    />
+    <meta property="og:description" content="Explore practical work in business automation, digital content and AI-assisted applications." />
     <meta property="og:type" content="website" />
-    <link rel="icon" href="/favicon.svg" />
+    <meta name="color-scheme" content="dark light" />
     <title>Thales Serra Xavier | Portfolio</title>
+    <script>
+      // Apply saved theme before paint to avoid a flash.
+      try {
+        var t = localStorage.getItem('tx-theme');
+        document.documentElement.setAttribute('data-tx-theme', t === 'light' ? 'light' : 'dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

@@ -1,79 +1,70 @@
-# Thales Serra Xavier — Professional Portfolio
+# Thales Xavier — Portfolio Concept
 
-React + Vite static portfolio with React Router, Lucide icons, centralized English/Brazilian Portuguese content, persistent theme/language, five case studies and local-only demonstrations. No backend, credentials, paid API or authentication is required.
+An independent design prototype for a premium redesign of Thales Xavier's portfolio. It does not touch, replace or deploy the existing site.
 
-## Local development
+React 19 · TypeScript · Vite · Tailwind CSS v4 · Motion for React · Lucide · React Router
 
-Requires Node.js 20.19+ or 22.12+ and npm. From this directory:
+## Run it locally
 
-```sh
+Requires Node.js 20.19+ (22 recommended).
+
+```bash
 npm install
-npm run dev
-npm run build
-npm run preview
+npm run dev        # development server, http://localhost:5173
+npm run build      # type-check + production build into dist/
+npm run preview    # serve the production build, http://localhost:4173
+npm run lint       # oxlint
+node scripts/test-jarvis.mjs   # game tests (unchanged)
 ```
 
-Build output is `dist/`. Vite prints the local preview URL. The Google-hosted Manrope font is optional; system fonts provide a fallback when offline.
+## Deploy (Cloudflare Workers)
 
-## Content and configuration
+Cloudflare runs `npm run build` and serves `dist/` using `wrangler.jsonc`. `not_found_handling: "single-page-application"` makes clean URLs such as `/about` and `/projects/assignment-hub` work on refresh and direct links.
 
-- `src/config.js`: email, optional authorized portrait, GitHub, LinkedIn, résumé PDF and original application demo URLs. Blank optional links are hidden. Daily Planner displays “Demo Coming Soon” until configured.
-- `src/data.js`: bilingual project records, education, reported editable GPA, experience and skills. Preserve the distinction between supplied project claims and verified source inspection.
-- `src/i18n.js`: all interface translations. `pt` maps to the `pt-BR` document language.
-- `src/main.jsx`: React entry point. `src/App.jsx`: routing, layout, theme and language state.
-- `src/components/`: shared controls, project cards and interactive demonstrations.
-- `src/pages/pages.jsx`: content pages and case studies. `src/context.jsx`: shared translation context.
-- `src/styles.css`: responsive layout, light/dark variables and reduced-motion support.
+- **Legacy URLs:** `/education` and `/experience` redirect to `/about`, while `/skills` and `/contact` open the home page at that section.
+- **Game:** the Teófilo game lives in `public/jarvis/` and is served at `/jarvis/`, unchanged by the redesign.
+- **Sitemap:** to generate one, build with `SITE_URL=https://thalesxavierwork.com npm run build`.
+- **Single-file preview:** `VITE_ROUTER=memory npx vite build` uses in-memory routing and inlines every asset. It is only for the shareable preview, not for deployment.
 
-Place a real portrait in `public/images/profile/` and set `config.portrait` to `/images/profile/filename.jpg`. Do not use a fictional portrait. Project media belongs in `public/images/projects/`; replace the labeled case-study media placeholder with authorized images and descriptive bilingual alt text. The current visual project tiles are labeled placeholders, not screenshots.
+## Structure
 
-For social media, place authorized files in `public/images/social-media/` and add entries to `galleryAssets` in `src/config.js`:
-
-```js
-{ id: 'real-flyer-1', type: 'flyer', src: '/images/social-media/real-flyer.jpg',
-  title: { en: 'Actual work title', pt: 'Título do trabalho real' },
-  alt: { en: 'Describe the real image', pt: 'Descreva a imagem real' } }
+```
+src/
+  index.css                 design tokens (dark + light), type scale, utilities
+  i18n/en.ts, pt.ts         all visible copy; pt.ts is type-checked against en.ts
+  i18n/index.tsx            language context (EN default, remembered per browser)
+  theme/ThemeProvider.tsx   theme context (dark default, remembered per browser)
+  data/projects.ts          project registry (structure only, no copy)
+  components/               Nav, Hero, ProjectCard, Sections (skills, process, contact, footer), ui primitives
+  components/previews/      illustrative interface mockups per project
+  demos/NovaDriveDemo.tsx   customer-service simulation (chat + live event monitor)
+  demos/AssignmentHubDemo.tsx  fictional academic dashboard
+  pages/                    Home, Work, CaseStudy, About, NotFound
 ```
 
-Supported types: `flyer`, `carousel`, `video`, `thumbnail`. A carousel uses `slides: ['/images/social-media/slide-1.jpg', '/images/social-media/slide-2.jpg']` and can omit `src`. Video uses a browser-playable MP4 URL in `src`. Real images open in a native accessible modal with focus containment, Escape dismissal and focus return; carousels have previous/next buttons. Videos have native controls. Empty categories show labeled placeholders. No client artwork was invented.
+## Design system
 
-The customer-service demo uses the fictional company Nova Demo and synthetic information. It simulates triage, registration, notification and handoff using local state only. Assignment Hub uses fictional October 2026 deadlines, course filters, completion, list and monthly calendar views, and simulated sync/notifications. Demo changes reset on reload. Neither demonstration accesses real WhatsApp, databases, OpenAI, Moodle or Google Calendar. Original application links must point to separately deployed applications. Video clipping remains conceptual pending source verification.
+- **Color:** graphite `#0F1113`, surface `#15181B`, off-white `#ECECE8`, neutral grays, one "signal" blue accent (`#8A9BFF` dark / `#3245D1` light) used only for routes, live states and focus. Text tokens meet WCAG AA on their backgrounds in both themes.
+- **Type:** Bricolage Grotesque (variable, condensed width for display) + IBM Plex Sans for reading. IBM Plex Mono appears only in the event log, where content is genuinely machine data. Fonts are self-hosted via Fontsource.
+- **Signature:** the hero headline is literally connected by a route line with a node at each line of type. The same route language returns in the process section and the demo's event monitor.
+- **Motion:** one orchestrated hero entrance, subtle section reveals, page transitions and pointer-follow light on project cards (fine pointers only). `MotionConfig reducedMotion="user"` plus a CSS fallback honor reduced-motion preferences; content never depends on animation to be visible or scrollable.
 
-## GitHub and Cloudflare Pages
+## Demos and data
 
-1. The source repository is [thalesxavier1298/ThalesXavier-Lab](https://github.com/thalesxavier1298/ThalesXavier-Lab), branch `main`. The initial source upload has been confirmed.
-2. Clone the repository and run `npm install` to develop on another computer. Commit and push future source changes. Never commit secrets, `node_modules` or generated `dist` files.
-3. In Cloudflare, open Workers & Pages, create a Pages project and connect that GitHub repository.
-4. Choose the Vite preset, build command `npm run build`, output `dist`, and this folder as the root if nested in a repository. Use a supported Node version (22 or 24).
-5. Deploy. The generated Pages URL is the initial public address. No deployment has been performed by this local project.
-6. Pages provides its default SPA fallback when no top-level `404.html` is present. Do not add the catch-all `/* /index.html 200` redirect: the Workers deployment rejects that rule as a loop. Verify `/about`, `/projects/assignment-hub` and an unknown path by direct visit and refresh on the actual host.
-7. Add a custom domain later in the project's Custom domains section and follow Cloudflare's DNS instructions.
-8. Update `config.siteUrl` when the final origin is known. The next production build automatically generates `dist/sitemap.xml` and its entry in `robots.txt` using that real origin. Until configured, sitemap generation is deferred to avoid inventing a domain. Add canonical/OG URL metadata once the actual public origin is chosen if desired.
-9. Future edits pushed to the connected production branch trigger a new build. Add social/profile links and independent app URLs in configuration only when their real addresses are available.
+Both demos run entirely in component state. No backend, no external API calls, no storage of personal data; restarting or leaving the page discards everything. The NovaDrive email is masked in the event log. Theme and language preferences are the only things saved (in localStorage, wrapped so the site still works when storage is blocked).
 
-## Existing Cloudflare Workers project
+## Content source
 
-The dashboard deployment log showed the project `thalesxavier-lab` uses Workers Static Assets rather than Pages. This is supported by the checked-in `wrangler.jsonc`:
+All personal and project content now comes from the current production site's repository (`thalesxavier1298/ThalesXavier-Lab`, `src/data.js`, `src/i18n.js`, `src/config.js`), adapted to this design. Photos come from its `public/images/profile/` folder and live in `src/assets/`.
 
-- Build command: `npm run build`.
-- Deploy command: `npx wrangler deploy`.
-- Root directory: repository root (leave blank or use `/` in the dashboard).
-- Worker name: `thalesxavier-lab`, matching the existing project.
-- Static asset directory: `./dist`.
-- SPA fallback: `assets.not_found_handling: "single-page-application"`.
+Still to confirm or supply:
 
-No Worker script, database or secrets are required. The unsupported catch-all `_redirects` file has been removed; preserve that removal in future builds. Deploy the corrected commit, rather than retrying the old failed commit. Cloudflare supplies the actual public URL after a successful deployment; no URL is assumed here. Actual hosted route checks remain pending until that URL is available.
+1. **Video project** — this design keeps the brief's framing (a workflow using existing AI tools, not software Thales built) merged with the site's "Video Analysis & Clipping" concept. Tools listed: CapCut, ChatGPT.
+2. **Teófilo game** — the Work page links to `https://thalesxavierwork.com/jarvis/` (`GAME_URL` in `src/lib/utils.ts`); confirm the path once this design replaces the current site.
+3. **Media** — social-media gallery placeholders and app screenshots (Daily Planner, Assignment Hub).
+4. **Links** — LinkedIn URL, résumé PDF, and Daily Planner public URL.
+5. **Skills** — React was added from the redesign brief; the current site does not list it.
 
-## Routes
+## Reference note
 
-`/`, `/about`, `/education`, `/experience`, `/skills`, `/projects`, `/contact`, `/projects/customer-service-automation`, `/projects/social-media-content`, `/projects/daily-planner`, `/projects/assignment-hub`, `/projects/ai-video-clipping`; unknown routes render the portfolio's 404 view.
-
-## Accessibility and verification
-
-Semantic landmarks, skip link, active navigation, visible focus rings, native controls/dialogs, translated labels, touch targets, reduced motion and system theme detection are included. Production build and browser verification results are recorded in `QA.md`. The gallery's actual media playback and real integrations require supplied files/URLs and are not asserted as tested with nonexistent assets.
-
-The supplied professional portrait and soccer trophy photo are configured in the site. Add authorized project media, confirm personal facts, and configure live application/social URLs as they become available. No private data, production workflow definitions or API keys belong in this static project.
-
-## Personal photos and portfolio identity
-
-The header and footer show Portfolio (EN) / Portfólio (PT). In `src/config.js`, `portrait` supplies the Home/About image, `portraitPosition` controls its CSS framing, and `athleticPhoto` supplies the Education athletics image. The trophy photograph is displayed at its original aspect ratio to preserve the full image. Both files are in `public/images/profile/`. Replace paths there to change photos; clearing `athleticPhoto` restores the labeled placeholder. Alternative text and captions are centralized in `src/i18n.js`.
+The three reference sites (allerstudio.com, lundanistudio.framer.website/about, rig.ai) could not be loaded from the build environment. The design follows the role the brief assigned to each reference rather than their specific visual details, and copies nothing from them.
